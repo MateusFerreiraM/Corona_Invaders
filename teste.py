@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from PPlay.window import *
 from PPlay.sprite import *
 from PPlay.gameimage import *
@@ -6,738 +9,689 @@ from PPlay.collision import *
 from PPlay.animation import *
 from PPlay.keyboard import Keyboard
 from PPlay.mouse import *
-from PPlay.sound import * # Importar a classe Sound
+from PPlay.sound import *
 import random
+import string
 
-# --- Constantes Globais ---
-# Configurações da Janela
+# --- Constantes de Configuração ---
+
+# Janela e Título
 WINDOW_WIDTH = 900
 WINDOW_HEIGHT = 600
 GAME_TITLE = "Corona Invaders"
-BACKGROUND_COLOR = (0, 0, 0) # Cor preta para o fundo
-
-# Power-Ups
-POWERUP_SHIELD_PATH = "assets/powerup_shield.png"
-POWERUP_FAST_SHOT_PATH = "assets/powerup_fast_shot.png"
-POWERUP_DROP_CHANCE = 0.10 # Chance de um power-up cair (10%)
-POWERUP_SPEED = 100 # Velocidade de queda dos power-ups
-POWERUP_SHIELD_DURATION = 5.0 # Duração do escudo em segundos
-POWERUP_FAST_SHOT_DURATION = 5.0 # Duração do tiro rápido em segundos
-FAST_SHOT_COOLDOWN_MULTIPLIER = 0.5 # Multiplicador para o cooldown de tiro (ex: 0.5 = metade do tempo)
-POWERUP_TYPE_SHIELD = 0
-POWERUP_TYPE_FAST_SHOT = 1
+BACKGROUND_COLOR = (0, 0, 0)
 
 # Estados do Jogo
 GAME_STATE_MENU = 1
 GAME_STATE_PLAYING = 2
 GAME_STATE_DIFFICULTY = 3
 GAME_STATE_RANKING = 4
-GAME_STATE_EXIT = 5
+GAME_STATE_GAME_OVER = 5
+GAME_STATE_EXIT = 6
 
 # Dificuldades
 DIFFICULTY_EASY = 1
 DIFFICULTY_MEDIUM = 2
 DIFFICULTY_HARD = 3
 
-# Configurações do Jogo
-INITIAL_DIFFICULTY = DIFFICULTY_MEDIUM # Dificuldade inicial padrão
+# Caminhos dos Assets (Paths)
+ASSET_PATH = "assets/"
+FONT_NAME = "Arial"
+
+# Áudio
+# ALTERAÇÃO: Apenas uma música de fundo
+MUSIC_BACKGROUND_PATH = ASSET_PATH + "game_music.ogg" 
+SOUND_PLAYER_SHOOT_PATH = ASSET_PATH + "player_shoot.ogg"
+SOUND_ENEMY_EXPLOSION_PATH = ASSET_PATH + "enemy_explosion.ogg"
+SOUND_PLAYER_HIT_PATH = ASSET_PATH + "player_hit.ogg"
+
+# Imagens
+PLAYER_SPRITE_PATH = ASSET_PATH + "nave.png"
+PLAYER_SHIELD_SPRITE_PATH = ASSET_PATH + "player_shield.png"
+PLAYER_DEATH_ANIM_PATH = ASSET_PATH + "jogo_jogador-respawn.png"
+ENEMY_SPRITE_PATH = ASSET_PATH + "corona.png"
+PLAYER_BULLET_PATH = ASSET_PATH + "gota.png"
+ENEMY_BULLET_PATH = ASSET_PATH + "tirocorona.png"
+POWERUP_SHIELD_PATH = ASSET_PATH + "powerup_shield.png"
+POWERUP_FAST_SHOT_PATH = ASSET_PATH + "powerup_fast_shot.png"
+MENU_BACKGROUND_PATH = ASSET_PATH + "menu.png"
+DIFFICULTY_BACKGROUND_PATH = ASSET_PATH + "dificuldade.png"
+RANKING_TITLE_PATH = ASSET_PATH + "ranking_titulo.png"
+
+# --- Constantes de Gameplay ---
+
+# Jogador
 PLAYER_INITIAL_LIVES_BASE = 6
-PLAYER_INITIAL_POS_OFFSET_Y = 5
-PLAYER_SPEED_MULTIPLIER = 10
+PLAYER_SPEED = 600
 PLAYER_SHOOT_COOLDOWN = 0.5
-BULLET_SPEED_MULTIPLIER = -7 # Negativo para ir para cima
+PLAYER_INITIAL_POS_OFFSET_Y = 5
+
+# Inimigos
 ENEMY_INITIAL_ROWS_BASE = 0
 ENEMY_INITIAL_COLUMNS_BASE = 1
 ENEMY_INITIAL_Y_OFFSET = 50
-ENEMY_MOVEMENT_BASE_SPEED = 2
+ENEMY_MOVEMENT_BASE_SPEED = 120
 ENEMY_ADVANCE_COOLDOWN = 0.15
 ENEMY_ADVANCE_Y_OFFSET = 20
 ENEMY_SHOT_COOLDOWN_BASE = 4
-ENEMY_BULLET_SPEED_BASE = 2
+ENEMY_HORIZONTAL_SPACING = 15
+ENEMY_VERTICAL_SPACING = 15
+
+# Projéteis
+BULLET_SPEED_PLAYER = -420
+ENEMY_BULLET_SPEED_BASE = 120
 ENEMY_BULLET_SPEED_FACTOR_QUANTITY = 0.2
 ENEMY_BULLET_SPEED_FACTOR_LEVEL = 0.5
-ENEMY_BULLET_SPEED_QUANTITY_DIVISOR = 70 # Valor original na fórmula da velocidade do tiro inimigo
-ENEMY_HORIZONTAL_SPACING = 15  # Espaçamento horizontal entre inimigos
-ENEMY_VERTICAL_SPACING = 15    # Espaçamento vertical entre inimigos
+ENEMY_BULLET_SPEED_QUANTITY_DIVISOR = 70
+
+# Power-Ups
+POWERUP_DROP_CHANCE = 0.10
+POWERUP_SPEED = 100
+POWERUP_SHIELD_DURATION = 5.0
+POWERUP_FAST_SHOT_DURATION = 5.0
+FAST_SHOT_COOLDOWN_MULTIPLIER = 0.5
+POWERUP_TYPE_SHIELD = 0
+POWERUP_TYPE_FAST_SHOT = 1
+
+# Pontuação
 SCORE_HIT_ENEMY_BASE = 50
 SCORE_PASS_LEVEL_BASE = 1000
 
-# Textos do Jogo
-FONT_NAME = "Arial"
+# UI e Texto
 FONT_COLOR = (255, 255, 255)
 FONT_SIZE_SMALL = 25
 FONT_SIZE_MEDIUM = 28
 FONT_SIZE_LARGE = 32
 
-# PPlay FPS (usado em alguns cálculos de movimento)
-PPLAY_FPS = 60 
+# Arquivos
+RANKING_FILE = 'ranking.txt'
 
-# --- Constantes de Áudio ---
-MUSIC_MENU_PATH = "assets/menu_music.ogg"
-SOUND_PLAYER_SHOOT_PATH = "assets/player_shoot.ogg"
-SOUND_ENEMY_EXPLOSION_PATH = "assets/enemy_explosion.ogg"
-SOUND_PLAYER_HIT_PATH = "assets/player_hit.ogg"
+# --- Variáveis Globais de Estado ---
+GAME_CURRENT_STATE = GAME_STATE_MENU
+DIFFICULTY_LEVEL = DIFFICULTY_MEDIUM
 
-MUSIC_VOLUME = 1 # Ajuste de 0.0 a 1.0
-SOUND_VOLUME = 1 # Ajuste de 0.0 a 1.0
+# --- Classes do Jogo ---
 
-# --- Variáveis Globais (mantidas para o estado atual do jogo) ---
-GAME_STATE = GAME_STATE_MENU
-DIFICULDADE = INITIAL_DIFFICULTY 
+class AssetManager:
+    """Classe para pré-carregar sons e evitar carregamento durante o jogo."""
+    def __init__(self):
+        self.player_shoot = Sound(SOUND_PLAYER_SHOOT_PATH)
+        self.player_hit = Sound(SOUND_PLAYER_HIT_PATH)
+        self.enemy_explosion = Sound(SOUND_ENEMY_EXPLOSION_PATH)
+        # ALTERAÇÃO: Carrega apenas uma música
+        self.background_music = Sound(MUSIC_BACKGROUND_PATH)
+        
+    def set_volume(self, volume):
+        vol_int = int(volume * 100)
+        self.player_shoot.set_volume(vol_int)
+        self.player_hit.set_volume(vol_int)
+        self.enemy_explosion.set_volume(vol_int)
+        self.background_music.set_volume(vol_int)
 
-
-class Jogador(object):
-    def __init__(self, janela):
+class Jogador:
+    """Gerencia o jogador, seus movimentos, tiros e power-ups."""
+    def __init__(self, janela, assets):
         self.janela = janela
-        self.player = Sprite("assets/nave.png")
+        self.assets = assets
+        self.player = Sprite(PLAYER_SPRITE_PATH)
+        self.shield_sprite = Sprite(PLAYER_SHIELD_SPRITE_PATH)
         self.listaTiros = []
         self.teclado = self.janela.get_keyboard()
         self.cronometroTiros = 0
-        self.vidas = PLAYER_INITIAL_LIVES_BASE - DIFICULDADE
-        self.set_pos()
+        self.vidas = PLAYER_INITIAL_LIVES_BASE - DIFFICULTY_LEVEL
         
-        self.shoot_sound = Sound(SOUND_PLAYER_SHOOT_PATH)
-        self.shoot_sound.set_volume(SOUND_VOLUME)
-
-        # NOVO: Atributos para power-ups
         self.has_shield = False
         self.shield_timer = 0.0
         self.is_fast_shooting = False
         self.fast_shot_timer = 0.0
+        
+        self.set_initial_pos()
 
-        # Sprite do escudo (se for uma imagem separada ou um overlay)
-        # Se o escudo for um overlay/imagem separada:
-        self.shield_sprite = Sprite("assets/player_shield.png") # Crie esta imagem!
-        # Ajuste a escala/posição conforme necessário.
-        # self.shield_sprite.set_scale(1.1) # Exemplo para deixar o escudo um pouco maior que a nave
-
-
-    def set_pos(self):
+    def set_initial_pos(self):
         self.player.set_position(
             (self.janela.width / 2) - (self.player.width / 2),
             self.janela.height - (self.player.height + PLAYER_INITIAL_POS_OFFSET_Y)
         )
 
-    def _draw(self):
-        self.player.draw()
-        for tiro in self.listaTiros:
-            tiro.draw()
-
     def atirar(self):
-        tiro = Sprite("assets/gota.png")
-        tiro.set_position(
-            self.player.x + self.player.width / 2 - tiro.width / 2,
-            self.player.y
-        )
+        tiro = Sprite(PLAYER_BULLET_PATH)
+        tiro.set_position(self.player.x + self.player.width / 2 - tiro.width / 2, self.player.y)
         self.listaTiros.append(tiro)
-        self.shoot_sound.play()
+        self.assets.player_shoot.play()
 
-    def atualizarTiros(self):
-        tiros_a_manter = []
-        for tiro in self.listaTiros:
-            tiro.move_y(self.janela.delta_time() * PPLAY_FPS * BULLET_SPEED_MULTIPLIER)
-            if tiro.y > 0:
-                tiros_a_manter.append(tiro)
-        self.listaTiros = tiros_a_manter
+    def _handle_input(self):
+        dt = self.janela.delta_time()
+        if self.teclado.key_pressed("LEFT"):
+            self.player.x -= PLAYER_SPEED * dt
+        if self.teclado.key_pressed("RIGHT"):
+            self.player.x += PLAYER_SPEED * dt
 
-    def run(self):        
-        self.player.move_key_x(PLAYER_SPEED_MULTIPLIER * self.janela.delta_time() * PPLAY_FPS)
+        current_shoot_cooldown = PLAYER_SHOOT_COOLDOWN * (FAST_SHOT_COOLDOWN_MULTIPLIER if self.is_fast_shooting else 1)
+        if self.teclado.key_pressed("SPACE") and self.cronometroTiros >= current_shoot_cooldown:
+            self.atirar()
+            self.cronometroTiros = 0
+
+    def _update_timers(self):
+        dt = self.janela.delta_time()
+        self.cronometroTiros += dt
         
-        self.cronometroTiros += self.janela.delta_time()
-
-        # NOVO: Ajustar cooldown de tiro se fast shot estiver ativo
-        current_shoot_cooldown = PLAYER_SHOOT_COOLDOWN
-        if self.is_fast_shooting:
-            current_shoot_cooldown *= FAST_SHOT_COOLDOWN_MULTIPLIER
-
-        if self.cronometroTiros >= current_shoot_cooldown: # Usar o cooldown ajustado
-            if self.teclado.key_pressed("SPACE"):
-                self.atirar()
-                self.cronometroTiros = 0
-
-        if self.player.x < 0:
-            self.player.set_position(0, self.player.y)
-        elif self.player.x + self.player.width > self.janela.width:
-            self.player.x = self.janela.width - self.player.width
-        
-        self.atualizarTiros()
-        self._draw()
-
         if self.has_shield:
-            self.shield_timer -= self.janela.delta_time()
-            # Posiciona o escudo na mesma posição do jogador
-            self.shield_sprite.set_position(
-                self.player.x + (self.player.width - self.shield_sprite.width) / 2, # Centraliza
-                self.player.y + (self.player.height - self.shield_sprite.height) / 2 # Centraliza
-            )
-            self.shield_sprite.draw()
+            self.shield_timer -= dt
             if self.shield_timer <= 0:
                 self.has_shield = False
-
+        
         if self.is_fast_shooting:
-            self.fast_shot_timer -= self.janela.delta_time()
+            self.fast_shot_timer -= dt
             if self.fast_shot_timer <= 0:
                 self.is_fast_shooting = False
 
-class Inimigos(object):
-    def __init__(self, janela, nivel):
+    def _update_positions(self):
+        self.player.x = max(0, min(self.player.x, self.janela.width - self.player.width))
+        
+        self.listaTiros = [tiro for tiro in self.listaTiros if tiro.y > -tiro.height]
+        for tiro in self.listaTiros:
+            tiro.move_y(BULLET_SPEED_PLAYER * self.janela.delta_time())
+
+    def draw(self):
+        self.player.draw()
+        for tiro in self.listaTiros:
+            tiro.draw()
+        
+        if self.has_shield:
+            self.shield_sprite.set_position(
+                self.player.x + (self.player.width - self.shield_sprite.width) / 2,
+                self.player.y + (self.player.height - self.shield_sprite.height) / 2
+            )
+            self.shield_sprite.draw()
+
+    def run(self):
+        self._handle_input()
+        self._update_timers()
+        self._update_positions()
+        self.draw()
+
+class Inimigos:
+    """Gerencia o exército de inimigos, seus movimentos e tiros."""
+    def __init__(self, janela, nivel, dificuldade):
         self.janela = janela
         self.nivel = nivel
+        self.dificuldade = dificuldade
         self.matrizInimigos = []
-        self.quantidadeColunas = DIFICULDADE + ENEMY_INITIAL_COLUMNS_BASE
-        self.quantidadeLinhas = DIFICULDADE + ENEMY_INITIAL_ROWS_BASE
-        self.quantidadeInimigos = self.quantidadeColunas * self.quantidadeLinhas
-        self.velocidadeInimigos = 0 
+        self.quantidadeColunas = self.dificuldade + ENEMY_INITIAL_COLUMNS_BASE + (nivel -1)
+        self.quantidadeLinhas = self.dificuldade + ENEMY_INITIAL_ROWS_BASE
+        self.quantidadeInimigos = 0
         self.direcaoInimigos = 1
         self.listaTiros = []
         self.cronometroTiro = 0
         self.cronometroAvancar = 0
-        self.velocidadeTiro = 0 
         self.spawn()
 
     def spawn(self):
         self.matrizInimigos.clear()
-        
-        temp_enemy = Sprite("assets/corona.png")
-        enemy_width = temp_enemy.width
-        enemy_height = temp_enemy.height
+        enemy_sprite = Sprite(ENEMY_SPRITE_PATH)
+        enemy_width = enemy_sprite.width
+        enemy_height = enemy_sprite.height
 
-        total_width_of_enemies_grid = (self.quantidadeColunas * enemy_width) + ((self.quantidadeColunas - 1) * ENEMY_HORIZONTAL_SPACING)
-        start_x = (self.janela.width - total_width_of_enemies_grid) / 2
-
-        start_y = ENEMY_INITIAL_Y_OFFSET
+        grid_width = (self.quantidadeColunas * enemy_width) + ((self.quantidadeColunas - 1) * ENEMY_HORIZONTAL_SPACING)
+        start_x = (self.janela.width - grid_width) / 2
 
         for i in range(self.quantidadeLinhas):
-            self.matrizInimigos.append([])
+            linha = []
             for j in range(self.quantidadeColunas):
-                inimigo = Sprite("assets/corona.png")
-                
+                inimigo = Sprite(ENEMY_SPRITE_PATH)
                 pos_x = start_x + j * (enemy_width + ENEMY_HORIZONTAL_SPACING)
-                pos_y = start_y + i * (enemy_height + ENEMY_VERTICAL_SPACING)
-
+                pos_y = ENEMY_INITIAL_Y_OFFSET + i * (enemy_height + ENEMY_VERTICAL_SPACING)
                 inimigo.set_position(pos_x, pos_y)
-                self.matrizInimigos[i].append(inimigo)
-        self.quantidadeInimigos = sum(len(linha) for linha in self.matrizInimigos)
-
-    def moverInimigos(self):
-        if self.quantidadeInimigos > 0:
-            self.velocidadeInimigos = (
-                self.janela.delta_time() * PPLAY_FPS * self.direcaoInimigos *
-                (ENEMY_MOVEMENT_BASE_SPEED + DIFICULDADE / 3 + 2 / self.quantidadeInimigos)
-            )
+                linha.append(inimigo)
+            self.matrizInimigos.append(linha)
         
-        for linha in self.matrizInimigos:
-            for inimigo in linha:
-                inimigo.move_x(self.velocidadeInimigos)
-    
-    def atirar(self):
-        cooldown_necessario = ENEMY_SHOT_COOLDOWN_BASE / DIFICULDADE + (self.nivel * 0.5)
-        self.cronometroTiro += self.janela.delta_time()
+        self.quantidadeInimigos = self.quantidadeColunas * self.quantidadeLinhas
 
-        if self.cronometroTiro > cooldown_necessario and self.quantidadeInimigos > 0:
-            inimigos_achatados = [inimigo for linha in self.matrizInimigos for inimigo in linha]
-            if inimigos_achatados:
-                inimigo_atirador = random.choice(inimigos_achatados)
-                tiro = Sprite("assets/tirocorona.png")
-                tiro.set_position(
-                    inimigo_atirador.x + inimigo_atirador.width / 2 - tiro.width / 2,
-                    inimigo_atirador.y
-                )
-                self.listaTiros.append(tiro)
-                self.cronometroTiro = 0
-
-    def atualizarTiros(self):
+    def _move_and_advance(self):
+        dt = self.janela.delta_time()
         if self.quantidadeInimigos > 0:
-            self.velocidadeTiro = (
-                ENEMY_BULLET_SPEED_BASE + 
-                (ENEMY_BULLET_SPEED_QUANTITY_DIVISOR / self.quantidadeInimigos) * ENEMY_BULLET_SPEED_FACTOR_QUANTITY + 
-                self.nivel * ENEMY_BULLET_SPEED_FACTOR_LEVEL
-            )
-        else:
-            self.velocidadeTiro = ENEMY_BULLET_SPEED_BASE
+            speed_multiplier = (ENEMY_MOVEMENT_BASE_SPEED + self.dificuldade * 20 + 200 / self.quantidadeInimigos)
+            velocidade_x = self.direcaoInimigos * speed_multiplier * dt
+            for linha in self.matrizInimigos:
+                for inimigo in linha:
+                    inimigo.move_x(velocidade_x)
 
-        tiros_a_manter = []
-        for tiro in self.listaTiros:
-            tiro.move_y(self.janela.delta_time() * PPLAY_FPS * self.velocidadeTiro)
-            if tiro.y < self.janela.height:
-                tiros_a_manter.append(tiro)
-        self.listaTiros = tiros_a_manter
-
-    def checarLimitesLaterais(self):
-        for linha in self.matrizInimigos:
-            for inimigo in linha:
-                if inimigo.x <= 0 or inimigo.x >= (self.janela.width - inimigo.width):
-                    return True
-        return False
-
-    def avancarInimigos(self):
-        self.cronometroAvancar += self.janela.delta_time()
+        self.cronometroAvancar += dt
         if self.cronometroAvancar > ENEMY_ADVANCE_COOLDOWN:
-            if self.checarLimitesLaterais():
+            atingiu_limite = any(
+                inimigo.x <= 0 or (inimigo.x + inimigo.width) >= self.janela.width
+                for linha in self.matrizInimigos for inimigo in linha
+            )
+            if atingiu_limite:
                 self.direcaoInimigos *= -1
                 for linha in self.matrizInimigos:
                     for inimigo in linha:
                         inimigo.y += ENEMY_ADVANCE_Y_OFFSET
                 self.cronometroAvancar = 0
 
-    def _draw(self):
+    def _shoot(self):
+        if not self.matrizInimigos or self.quantidadeInimigos == 0:
+            return
+
+        cooldown = max(0.5, (ENEMY_SHOT_COOLDOWN_BASE / self.dificuldade) - (self.nivel * 0.2))
+        self.cronometroTiro += self.janela.delta_time()
+
+        if self.cronometroTiro > cooldown:
+            self.cronometroTiro = 0
+            inimigos_disponiveis = [inimigo for linha in self.matrizInimigos for inimigo in linha]
+            if inimigos_disponiveis:
+                atirador = random.choice(inimigos_disponiveis)
+                tiro = Sprite(ENEMY_BULLET_PATH)
+                tiro.set_position(atirador.x + atirador.width / 2 - tiro.width / 2, atirador.y + atirador.height)
+                self.listaTiros.append(tiro)
+
+    def _update_bullets(self):
+        if self.quantidadeInimigos > 0:
+            velocidade_tiro = (
+                ENEMY_BULLET_SPEED_BASE + 
+                (ENEMY_BULLET_SPEED_QUANTITY_DIVISOR / self.quantidadeInimigos) * ENEMY_BULLET_SPEED_FACTOR_QUANTITY + 
+                self.nivel * ENEMY_BULLET_SPEED_FACTOR_LEVEL
+            )
+        else:
+            velocidade_tiro = ENEMY_BULLET_SPEED_BASE
+        
+        self.listaTiros = [tiro for tiro in self.listaTiros if tiro.y < self.janela.height]
+        for tiro in self.listaTiros:
+            tiro.move_y(velocidade_tiro * self.janela.delta_time())
+
+    def draw(self):
         for linha in self.matrizInimigos:
             for inimigo in linha:
                 inimigo.draw()
-                
         for tiro in self.listaTiros:
             tiro.draw()
-    
-    def run(self):
-        self.moverInimigos()
-        self.avancarInimigos()
-        self.atirar()
-        self.atualizarTiros()
-        self._draw()
 
-class PowerUp(object):
+    def run(self):
+        self._move_and_advance()
+        self._shoot()
+        self._update_bullets()
+        self.draw()
+
+class PowerUp(Sprite):
+    """Classe para os objetos de Power-up que caem na tela."""
     def __init__(self, janela, x, y, type_id):
         self.janela = janela
         self.type_id = type_id
-        self.sprite = None
-
-        # Carrega a imagem do power-up com base no tipo
-        if self.type_id == POWERUP_TYPE_SHIELD:
-            self.sprite = Sprite(POWERUP_SHIELD_PATH)
-        elif self.type_id == POWERUP_TYPE_FAST_SHOT:
-            self.sprite = Sprite(POWERUP_FAST_SHOT_PATH)
-        # elif self.type_id == POWERUP_TYPE_LIFE: # Para futura implementação
-        #     self.sprite = Sprite(POWERUP_LIFE_PATH)
-        # elif self.type_id == POWERUP_TYPE_TRIPLE_SHOT: # Para futura implementação
-        #     self.sprite = Sprite(POWERUP_TRIPLE_SHOT_PATH)
-
-        if self.sprite: # Garante que um sprite foi carregado
-            self.sprite.set_position(x, y)
-        else:
-            print(f"Erro: Sprite para PowerUp tipo {type_id} não encontrado.")
-
+        path = POWERUP_SHIELD_PATH if type_id == POWERUP_TYPE_SHIELD else POWERUP_FAST_SHOT_PATH
+        super().__init__(path)
+        self.set_position(x, y)
 
     def run(self):
-        if self.sprite:
-            # Move o power-up para baixo
-            self.sprite.move_y(self.janela.delta_time() * POWERUP_SPEED)
-            self.sprite.draw()
+        self.move_y(POWERUP_SPEED * self.janela.delta_time())
+        self.draw()
 
-    # Métodos auxiliares para colisão
-    def get_x(self):
-        return self.sprite.x
-    
-    def get_y(self):
-        return self.sprite.y
-    
-    def get_width(self):
-        return self.sprite.width
-
-    def get_height(self):
-        return self.sprite.height
-
-    def collided(self, other_sprite):
-        if self.sprite:
-            return Collision.collided(self.sprite, other_sprite)
-        return False
-
-class Jogar(object):
-    def __init__(self, janela):
+class Jogar:
+    """Classe principal que gerencia a tela de jogo."""
+    def __init__(self, janela, assets, dificuldade):
         self.janela = janela
-        self.pontuacao = 0
-        self.tempo = 0
-        self.nivel = 1
-        self.fps_counter = 0
-        self.current_fps = 0
-        self.fps_timer = 0
+        self.assets = assets
         self.teclado = janela.get_keyboard()
-        self.jogador = Jogador(self.janela)
-        self.inimigos = Inimigos(self.janela, self.nivel)
-        self.vivo = True
-        self.active_powerups = []
-
-        # Animação de morte/respawn do jogador (já existe)
-        self.playerDead = Animation("assets/jogo_jogador-respawn.png", 12)
-        self.playerDead.set_total_duration(1000) # 1 segundo
-        self.death_animation_timer = 1 # Usado para controlar quando a animação termina para o jogador
-
-        # NOVO: Animação de explosão para inimigos
-        # Usaremos a mesma animação do player para economizar recursos e manter consistência
-        self.enemy_explosion_animation_template = Animation("assets/jogo_jogador-respawn.png", 12)
-        self.enemy_explosion_animation_template.set_total_duration(500) # Mais rápida para inimigos (0.5 segundos)
-        
-        # Lista para gerenciar as animações de explosão ativas dos inimigos
-        self.active_enemy_explosions = [] 
-        
-        # Carregar os sons do jogo
-        self.enemy_explosion_sound = Sound(SOUND_ENEMY_EXPLOSION_PATH)
-        self.enemy_explosion_sound.set_volume(SOUND_VOLUME)
-        self.player_hit_sound = Sound(SOUND_PLAYER_HIT_PATH)
-        self.player_hit_sound.set_volume(SOUND_VOLUME)
-
-    def TiroNoInimigo(self):
-        for i, linha in enumerate(self.inimigos.matrizInimigos):
-            for j, inimigo in enumerate(linha):
-                for k, tiro_jogador in enumerate(self.jogador.listaTiros):
-                    if Collision.collided(tiro_jogador, inimigo):
-                        self.pontuacao += SCORE_HIT_ENEMY_BASE + SCORE_HIT_ENEMY_BASE / max(1, self.tempo)
-                        
-                        # INÍCIO NOVO: Lógica de drop de power-up
-                        if random.random() < POWERUP_DROP_CHANCE: # Chance de dropar
-                            # Escolhe um tipo de power-up aleatoriamente entre os disponíveis
-                            powerup_type = random.choice([POWERUP_TYPE_SHIELD, POWERUP_TYPE_FAST_SHOT])
-                            new_powerup = PowerUp(self.janela, inimigo.x, inimigo.y, powerup_type)
-                            self.active_powerups.append(new_powerup)
-                        # FIM NOVO: Lógica de drop de power-up
-
-                        new_explosion = Animation("assets/jogo_jogador-respawn.png", 12)
-                        new_explosion.set_total_duration(self.enemy_explosion_animation_template.total_duration)
-                        new_explosion.set_position(inimigo.x, inimigo.y)
-                        new_explosion.animation_timer = 0.0
-                        self.active_enemy_explosions.append(new_explosion)
-
-                        self.inimigos.matrizInimigos[i].pop(j)
-                        self.jogador.listaTiros.pop(k)
-                        self.enemy_explosion_sound.play() 
-                        if not self.inimigos.matrizInimigos[i]:
-                            self.inimigos.matrizInimigos.pop(i)
-                        self.inimigos.quantidadeInimigos = sum(len(linha) for linha in self.inimigos.matrizInimigos)
-                        return
-
-    def reset(self):
-        self.nivel = 1
+        self.dificuldade = dificuldade
         self.pontuacao = 0
-        self.vivo = True
-        self.inimigos = Inimigos(self.janela, self.nivel)
-        self.jogador = Jogador(self.janela)
-        self.death_animation_timer = 1
+        self.nivel = 1
+        
+        self.jogador = Jogador(janela, assets)
+        self.inimigos = Inimigos(janela, self.nivel, self.dificuldade)
+        self.active_powerups = []
+        self.active_explosions = []
+        
+    def _check_collisions(self):
+        tiros_jogador_restantes = []
+        for tiro in self.jogador.listaTiros:
+            atingiu_alvo = False
+            for i, linha in enumerate(self.inimigos.matrizInimigos):
+                for j, inimigo in enumerate(linha):
+                    if not atingiu_alvo and tiro.collided(inimigo):
+                        atingiu_alvo = True
+                        self.pontuacao += SCORE_HIT_ENEMY_BASE * self.dificuldade
+                        self._create_explosion(inimigo.x, inimigo.y)
+                        self.assets.enemy_explosion.play()
 
-    def PassarDeNivel(self):
-        self.pontuacao += self.nivel * SCORE_PASS_LEVEL_BASE
-        self.nivel += 1
-        self.inimigos.quantidadeColunas += 1 
-        self.inimigos.quantidadeLinhas += 1
-        self.inimigos.direcaoInimigos *= 1.2
-        self.jogador.listaTiros.clear()
-        self.inimigos.listaTiros.clear()
-        self.tempo = 0
-        self.inimigos.spawn()
-        self.inimigos.quantidadeInimigos = sum(len(linha) for linha in self.inimigos.matrizInimigos)
+                        if random.random() < POWERUP_DROP_CHANCE:
+                            p_type = random.choice([POWERUP_TYPE_SHIELD, POWERUP_TYPE_FAST_SHOT])
+                            self.active_powerups.append(PowerUp(self.janela, inimigo.x, inimigo.y, p_type))
 
-    def checarGameOverY(self):
-        for linha in self.inimigos.matrizInimigos:
-            for inimigo in linha:
-                if inimigo.y + inimigo.height >= self.jogador.player.y:
-                    return True
-        return False
+                        linha.pop(j)
+                        self.inimigos.quantidadeInimigos -= 1
+                        break 
+                if atingiu_alvo:
+                    break
+            if not atingiu_alvo:
+                tiros_jogador_restantes.append(tiro)
+        self.jogador.listaTiros = tiros_jogador_restantes
+        self.inimigos.matrizInimigos = [linha for linha in self.inimigos.matrizInimigos if linha]
 
-    def TiroNoPlayer(self):
         for i, tiro_inimigo in enumerate(self.inimigos.listaTiros):
-            if Collision.collided(tiro_inimigo, self.jogador.player):
-                # NOVO: Verificar se o jogador tem escudo
-                if self.jogador.has_shield:
-                    self.jogador.has_shield = False # Escudo é quebrado
-                    self.inimigos.listaTiros.pop(i) # Remove o tiro inimigo
-                    # Opcional: Adicionar um som ou efeito visual para quebrar o escudo
-                    return # Não perde vida, sai da função
-                
-                # Se não tem escudo, a lógica de perda de vida continua
-                self.jogador.vidas -= 1
+            if tiro_inimigo.collided(self.jogador.player):
                 self.inimigos.listaTiros.pop(i)
-                self.player_hit_sound.play()
-                self.death_animation_timer = 0
-                self.playerDead.set_curr_frame(0)
-                self.playerDead.set_position(
-                    (self.janela.width / 2) - (self.jogador.player.width / 2),
-                    self.janela.height - (self.jogador.player.height + PLAYER_INITIAL_POS_OFFSET_Y)
-                )
-                if self.jogador.vidas != 0:
-                    self.respawn()
+                self._handle_player_hit()
                 break
 
-    def respawn(self):            
-        self.jogador.player.set_position(
-            (self.janela.width / 2) - (self.jogador.player.width / 2),
-            self.janela.height - (self.jogador.player.height + PLAYER_INITIAL_POS_OFFSET_Y)
-        )
-
-    def gameOver(self):            
-        try:
-            with open('ranking.txt','r') as arq:
-                conteudo = arq.readlines()
-        except FileNotFoundError:
-            conteudo = []
-
-        nome=str(input('Digite seu nome: '))
-        
-        if DIFICULDADE == DIFFICULTY_EASY:
-            self.nivelfinal = "fácil"
-        elif DIFICULDADE == DIFFICULTY_MEDIUM:
-            self.nivelfinal = "médio"
-        elif DIFICULDADE == DIFFICULTY_HARD:
-            self.nivelfinal = "difícil"
-        
-        linha = f"{nome} {self.nivelfinal} {int(self.pontuacao)}\n"
-        conteudo.append(linha)
-        
-        with open('ranking.txt', 'w') as arq:
-            arq.writelines(conteudo)
-        
-        print('Ranking atualizado com sucesso')
-        
-        self.inimigos = Inimigos(self.janela, self.nivel)
-        self.jogador = Jogador(self.janela)
-        self.reset()
-        global GAME_STATE
-        GAME_STATE = GAME_STATE_MENU
-
-    def run(self):
-        self.fps_timer += self.janela.delta_time()
-        self.fps_counter += 1
-        if self.fps_timer > 1: 
-            self.current_fps = self.fps_counter   
-            self.fps_counter = 0
-            self.fps_timer = 0
+        powerups_restantes = []
+        for powerup in self.active_powerups:
+            if powerup.collided(self.jogador.player):
+                if powerup.type_id == POWERUP_TYPE_SHIELD:
+                    self.jogador.has_shield = True
+                    self.jogador.shield_timer = POWERUP_SHIELD_DURATION
+                elif powerup.type_id == POWERUP_TYPE_FAST_SHOT:
+                    self.jogador.is_fast_shooting = True
+                    self.jogador.fast_shot_timer = POWERUP_FAST_SHOT_DURATION
+            else:
+                powerups_restantes.append(powerup)
+        self.active_powerups = powerups_restantes
+    
+    def _handle_player_hit(self):
+        if self.jogador.has_shield:
+            self.jogador.has_shield = False
+            return
             
-        if self.vivo: 
-            if self.inimigos.quantidadeInimigos == 0:
-                self.PassarDeNivel()
-            self.inimigos.run()
-            self.jogador.run()
-            self.TiroNoInimigo()
-            self.TiroNoPlayer()
+        # ALTERAÇÃO: Cria a explosão na posição do jogador ANTES de qualquer outra ação.
+        self._create_explosion(self.jogador.player.x, self.jogador.player.y)
+        
+        self.assets.player_hit.play()
+        self.jogador.vidas -= 1
+        
+        if self.jogador.vidas > 0:
+            # Respawn instantâneo
+            self.jogador.set_initial_pos()
+        else:
+            # Se for a última vida, move o jogador para fora da tela para "escondê-lo"
+            self.jogador.player.set_position(-1000, -1000)
 
-            self.tempo += self.janela.delta_time()
+    
+    def _create_explosion(self, x, y):
+        """Cria uma nova animação de explosão no local especificado."""
+        new_explosion = Animation(PLAYER_DEATH_ANIM_PATH, 12, loop=False)
+        new_explosion.set_total_duration(500)
+        new_explosion.set_position(x, y)
+        self.active_explosions.append(new_explosion)
+
+    def _update_animations(self):
+        self.active_explosions = [exp for exp in self.active_explosions if exp.get_curr_frame() < exp.get_final_frame() - 1]
+        for exp in self.active_explosions:
+            exp.update()
             
-            if self.teclado.key_pressed("ESC"):
-                global GAME_STATE
-                GAME_STATE = GAME_STATE_MENU
-                self.reset()
+    def _draw_hud(self):
+        self.janela.draw_text(f"Vidas: {self.jogador.vidas}", 10, 5, size=FONT_SIZE_MEDIUM, color=FONT_COLOR)
+        self.janela.draw_text(f"Nível: {self.nivel}", self.janela.width / 2 - 50, 5, size=FONT_SIZE_MEDIUM, color=FONT_COLOR)
+        self.janela.draw_text(f"Pontos: {int(self.pontuacao)}", self.janela.width - 210, 5, size=FONT_SIZE_MEDIUM, color=FONT_COLOR)
 
-            if self.checarGameOverY() or self.jogador.vidas == 0:
-                self.nivel = 1
-                self.vivo = False
-
-            self.janela.draw_text(
-                f"Vidas: {self.jogador.vidas}", 300, 5, 
-                size=FONT_SIZE_MEDIUM, color=FONT_COLOR, font_name=FONT_NAME
-            )
-            self.janela.draw_text(
-                f"FPS:{self.current_fps}", 0, 0, 
-                size=FONT_SIZE_SMALL, color=FONT_COLOR, font_name=FONT_NAME
-            )
-            self.janela.draw_text(
-                f"Nivel: {self.nivel}", 400, 5, 
-                size=FONT_SIZE_MEDIUM, color=FONT_COLOR, font_name=FONT_NAME
-            )
-            self.janela.draw_text(
-                f"Pontos: {int(self.pontuacao)}", 500, 5, 
-                size=FONT_SIZE_MEDIUM, color=FONT_COLOR, font_name=FONT_NAME
-            )
-
-            # NOVO: Desenhar e atualizar animações de explosão dos inimigos
-            explosions_to_keep = []
-            for explosion in self.active_enemy_explosions:
-                explosion.draw()
-                explosion.update()
-                
-                # Incrementa o timer da explosão
-                explosion.animation_timer += self.janela.delta_time()
-                
-                # Se o timer da explosão for maior ou igual à duração total da animação, ela terminou.
-                # Lembre-se que total_duration é em milissegundos, e delta_time é em segundos.
-                if explosion.animation_timer >= (explosion.total_duration / 1000.0):
-                    # A animação terminou, não a adiciona de volta à lista de "a manter"
-                    pass 
-                else:
-                    explosions_to_keep.append(explosion)
-            self.active_enemy_explosions = explosions_to_keep # Atualiza a lista com as explosões que ainda estão ativas
-
-        # Gerenciar Power-ups
-            powerups_to_keep = []
-            for powerup in self.active_powerups:
-                powerup.run() # Atualiza posição e desenha o power-up
-                
-                # Checar colisão com o jogador
-                if powerup.collided(self.jogador.player):
-                    # Aplica o efeito do power-up
-                    if powerup.type_id == POWERUP_TYPE_SHIELD:
-                        self.jogador.has_shield = True
-                        self.jogador.shield_timer = POWERUP_SHIELD_DURATION
-                    elif powerup.type_id == POWERUP_TYPE_FAST_SHOT:
-                        self.jogador.is_fast_shooting = True
-                        self.jogador.fast_shot_timer = POWERUP_FAST_SHOT_DURATION
-                    # Não adiciona o power-up à lista de "a manter" (ele foi coletado)
-                elif powerup.get_y() < self.janela.height: # Se o power-up ainda está na tela (não caiu)
-                    powerups_to_keep.append(powerup)
-            self.active_powerups = powerups_to_keep # Atualiza a lista
-
-        else: # Se o jogador não estiver mais vivo (Game Over)
-            self.gameOver()
-
-        # Animação de morte do jogador (já existe)
-        if self.death_animation_timer < 0.9:
-            self.playerDead.draw()
-            self.playerDead.update()
-            self.death_animation_timer += self.janela.delta_time()
-
-class DificuldadeConstantes:
-    EASY_BUTTON_COORDS = (241, 180, 470, 230)
-    MEDIUM_BUTTON_COORDS = (241, 265, 470, 315)
-    HARD_BUTTON_COORDS = (335, 350, 470, 410) 
-    BACK_BUTTON_COORDS = (335, 470, 565, 527)
-
-class Dificuldade(object):
-    def __init__(self, janela):
-        self.janela = janela
-        self.mouse = Mouse()
-        self.teclado = self.janela.get_keyboard() 
-
-        self.tela = GameImage("assets/dificuldade.png")
-
-    def _check_button_click(self, coords, difficulty_value=None, game_state_change=None):
-        if self.mouse.is_over_area(start_point=(coords[0], coords[1]), end_point=(coords[2], coords[3])):
-            if self.mouse.is_button_pressed(1):
-                global DIFICULDADE, GAME_STATE
-                if difficulty_value is not None:
-                    DIFICULDADE = difficulty_value
-                if game_state_change is not None:
-                    GAME_STATE = game_state_change
-                return True 
+    def _check_game_over_conditions(self):
+        if self.jogador.vidas <= 0:
+            return True
+        # Verifica se inimigos chegaram na posição Y do jogador (exceto se o jogador já morreu)
+        if self.jogador.vidas > 0:
+            for linha in self.inimigos.matrizInimigos:
+                for inimigo in linha:
+                    if (inimigo.y + inimigo.height) >= self.jogador.player.y:
+                        return True
         return False
 
+    def _level_up(self):
+        self.pontuacao += self.nivel * SCORE_PASS_LEVEL_BASE
+        self.nivel += 1
+        self.jogador.listaTiros.clear()
+        self.inimigos.listaTiros.clear()
+        self.active_powerups.clear()
+        self.inimigos = Inimigos(self.janela, self.nivel, self.dificuldade)
+
     def run(self):
-        self.tela.draw()
-
-        self._check_button_click(DificuldadeConstantes.EASY_BUTTON_COORDS, difficulty_value=DIFFICULTY_EASY)
-        self._check_button_click(DificuldadeConstantes.MEDIUM_BUTTON_COORDS, difficulty_value=DIFFICULTY_MEDIUM)
-        self._check_button_click(DificuldadeConstantes.HARD_BUTTON_COORDS, difficulty_value=DIFFICULTY_HARD)
-
-        global GAME_STATE
-        self._check_button_click(DificuldadeConstantes.BACK_BUTTON_COORDS, game_state_change=GAME_STATE_MENU) 
-        
         if self.teclado.key_pressed("ESC"):
-            GAME_STATE = GAME_STATE_MENU 
+            return GAME_STATE_MENU, self.pontuacao
 
-class Menu(object):
+        self.jogador.run()
+        self.inimigos.run()
+        
+        self.active_powerups = [p for p in self.active_powerups if p.y < self.janela.height]
+        for p in self.active_powerups:
+            p.run()
+            
+        self._check_collisions()
+        self._update_animations()
+
+        # Desenho dos elementos
+        self.inimigos.draw()
+        self.jogador.draw()
+        
+        for p in self.active_powerups:
+            p.draw()
+        for exp in self.active_explosions:
+            exp.draw()
+
+        self._draw_hud()
+
+        if self._check_game_over_conditions():
+            return GAME_STATE_GAME_OVER, self.pontuacao
+            
+        if self.inimigos.quantidadeInimigos == 0:
+            self._level_up()
+
+        return GAME_STATE_PLAYING, self.pontuacao
+
+class Menu:
+    """Tela de Menu principal."""
     def __init__(self, janela):
         self.janela = janela
-        self.tela = GameImage("assets/menu.png")
-        self.teclado = Window.get_keyboard()
-        self.mouse = Window.get_mouse()
+        self.background = GameImage(MENU_BACKGROUND_PATH)
+        self.mouse = Mouse()
+        self.play_coords = (335, 180, 567, 230)
+        self.diff_coords = (335, 265, 567, 315)
+        self.rank_coords = (335, 350, 567, 400)
+        self.exit_coords = (335, 435, 567, 485)
 
     def run(self):
-        self.tela.draw()
-        global GAME_STATE
+        self.background.draw()
+        
+        if self.mouse.is_over_area(start_point=(self.play_coords[0], self.play_coords[1]), end_point=(self.play_coords[2], self.play_coords[3])) and self.mouse.is_button_pressed(1):
+            return GAME_STATE_PLAYING
+        if self.mouse.is_over_area(start_point=(self.diff_coords[0], self.diff_coords[1]), end_point=(self.diff_coords[2], self.diff_coords[3])) and self.mouse.is_button_pressed(1):
+            return GAME_STATE_DIFFICULTY
+        if self.mouse.is_over_area(start_point=(self.rank_coords[0], self.rank_coords[1]), end_point=(self.rank_coords[2], self.rank_coords[3])) and self.mouse.is_button_pressed(1):
+            return GAME_STATE_RANKING
+        if self.mouse.is_over_area(start_point=(self.exit_coords[0], self.exit_coords[1]), end_point=(self.exit_coords[2], self.exit_coords[3])) and self.mouse.is_button_pressed(1):
+            return GAME_STATE_EXIT
+            
+        return GAME_STATE_MENU
 
-        if self.mouse.is_over_area(start_point=(335,180),end_point=(567,230)):
-            if self.mouse.is_button_pressed(1):
-                GAME_STATE = GAME_STATE_PLAYING
+class Dificuldade:
+    """Tela para seleção de dificuldade."""
+    def __init__(self, janela):
+        self.janela = janela
+        self.background = GameImage(DIFFICULTY_BACKGROUND_PATH)
+        self.mouse = Mouse()
+        self.teclado = janela.get_keyboard()
+        self.easy_coords = (241, 180, 470, 230)
+        self.medium_coords = (241, 265, 470, 315)
+        self.hard_coords = (335, 350, 470, 410)
+        self.back_coords = (335, 470, 565, 527)
 
-        if self.mouse.is_over_area(start_point=(335,265),end_point=(567,315)):
-            if self.mouse.is_button_pressed(1):
-                GAME_STATE = GAME_STATE_DIFFICULTY
+    def run(self):
+        global DIFFICULTY_LEVEL
+        self.background.draw()
+        
+        if self.mouse.is_over_area(start_point=(self.easy_coords[0], self.easy_coords[1]), end_point=(self.easy_coords[2], self.easy_coords[3])) and self.mouse.is_button_pressed(1):
+            DIFFICULTY_LEVEL = DIFFICULTY_EASY
+        if self.mouse.is_over_area(start_point=(self.medium_coords[0], self.medium_coords[1]), end_point=(self.medium_coords[2], self.medium_coords[3])) and self.mouse.is_button_pressed(1):
+            DIFFICULTY_LEVEL = DIFFICULTY_MEDIUM
+        if self.mouse.is_over_area(start_point=(self.hard_coords[0], self.hard_coords[1]), end_point=(self.hard_coords[2], self.hard_coords[3])) and self.mouse.is_button_pressed(1):
+            DIFFICULTY_LEVEL = DIFFICULTY_HARD
+            
+        if self.mouse.is_over_area(start_point=(self.back_coords[0], self.back_coords[1]), end_point=(self.back_coords[2], self.back_coords[3])) and self.mouse.is_button_pressed(1):
+            return GAME_STATE_MENU
+        if self.teclado.key_pressed("ESC"):
+            return GAME_STATE_MENU
+            
+        return GAME_STATE_DIFFICULTY
 
-        if self.mouse.is_over_area(start_point=(335,350),end_point=(567,400)):
-            if self.mouse.is_button_pressed(1):
-                GAME_STATE = GAME_STATE_RANKING
-
-        if self.mouse.is_over_area(start_point=(335,435),end_point=(567,485)):
-            if self.mouse.is_button_pressed(1):
-                GAME_STATE = GAME_STATE_EXIT
-
-class Ranking(object):
+class Ranking:
+    """Tela de exibição do Ranking."""
     def __init__(self, janela):
         self.janela = janela
         self.teclado = janela.get_keyboard()
-        self.titulo = Sprite("assets/ranking_titulo.png", 1)
-        self.set_pos()
+        self.titulo = Sprite(RANKING_TITLE_PATH)
+        self.titulo.set_position(janela.width/2 - self.titulo.width/2, 25)
+        self.scores = self._load_scores()
 
-    def set_pos(self):
-        self.titulo.set_position(self.janela.width/2 - self.titulo.width/2, 25)
-
-    def _draw(self):
-        self.titulo.draw()
+    def _load_scores(self):
+        try:
+            with open(RANKING_FILE, 'r') as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            return []
+        
+        scores_data = []
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) == 3:
+                name, difficulty, score = parts
+                try:
+                    scores_data.append({'name': name, 'difficulty': difficulty, 'score': int(score)})
+                except ValueError:
+                    continue
+        
+        return sorted(scores_data, key=lambda x: x['score'], reverse=True)
 
     def run(self):
-        self._draw()
-        try:
-            with open('ranking.txt','r') as arq:
-                conteudo = arq.readlines()
-        except FileNotFoundError:
-            conteudo = []
-
-        nomes = []
-        dificuldades = []
-        pontos = []
-
-        for linha_str in conteudo:
-            linha_split = linha_str.split()
-            if len(linha_split) >= 3:
-                nomes.append(linha_split[0])
-                dificuldades.append(linha_split[1])
-                try:
-                    pontos.append(int(linha_split[2]))
-                except ValueError:
-                    pontos.append(0)
-            else:
-                pass
-
-        for _ in range(len(pontos)):
-            for i in range(len(pontos) - 1):
-                if pontos[i] < pontos[i+1]:
-                    pontos[i+1], pontos[i] = pontos[i], pontos[i+1]
-                    nomes[i+1], nomes[i] = nomes[i], nomes[i+1]
-                    dificuldades[i+1], dificuldades[i] = dificuldades[i], dificuldades[i+1]
-
-        for i in range(min(5, len(nomes))):
-            self.janela.draw_text(
-                f"{i+1}º {nomes[i]} - Pontos: {pontos[i]} - Dificuldade: {dificuldades[i]}", 
-                200, 100 + i * 50, 
-                size=FONT_SIZE_LARGE, color=FONT_COLOR, font_name=FONT_NAME
-            )
+        self.titulo.draw()
         
-        global GAME_STATE
+        if not self.scores:
+            self.janela.draw_text("Nenhuma pontuação registrada.", 200, 150, size=FONT_SIZE_LARGE, color=FONT_COLOR)
+        else:
+            for i, entry in enumerate(self.scores[:5]):
+                text = f"{i+1}º {entry['name']} - {entry['score']} pts ({entry['difficulty']})"
+                self.janela.draw_text(text, 150, 120 + i * 60, size=FONT_SIZE_LARGE, color=FONT_COLOR)
+
+        self.janela.draw_text("Pressione ESC para voltar ao Menu", 250, 550, size=FONT_SIZE_SMALL, color=FONT_COLOR)
+        
         if self.teclado.key_pressed("ESC"):
-            GAME_STATE = GAME_STATE_MENU
+            return GAME_STATE_MENU
+            
+        return GAME_STATE_RANKING
 
-# --- Inicialização do Jogo ---
-janela = Window(WINDOW_WIDTH, WINDOW_HEIGHT)
-janela.set_title(GAME_TITLE)
-teclado = Window.get_keyboard()
-mouse = Window.get_mouse()
+class GameOverScreen:
+    """Tela de Game Over para inserir o nome do jogador."""
+    def __init__(self, janela, final_score):
+        self.janela = janela
+        self.teclado = janela.get_keyboard()
+        self.final_score = final_score
+        self.player_name = ""
+        self.cursor_timer = 0
+        self.show_cursor = True
+        self.last_key_press_time = 0
+        self.key_repeat_delay = 0.1
 
-menu = Menu(janela)
-dificuldade = Dificuldade(janela)
-ranking = Ranking(janela)
-jogo = Jogar(janela)
-
-# Carregar e configurar a música do menu aqui
-menu_music = Sound(MUSIC_MENU_PATH)
-menu_music.set_volume(MUSIC_VOLUME)
-
-# No loop principal do jogo
-
-# --- Loop Principal do Jogo ---
-while GAME_STATE != GAME_STATE_EXIT:
-    janela.set_background_color(BACKGROUND_COLOR)
-
-    # Lógica para tocar/parar a música de fundo
-    # REMOVA A LÓGICA ANTERIOR E COLOQUE ESTA ABAIXO:
-    if not menu_music.is_playing(): # A música sempre deve tocar, a menos que não esteja já tocando
-        menu_music.play()
-
-    if GAME_STATE == GAME_STATE_MENU:
-        menu.run()
-
-    elif GAME_STATE == GAME_STATE_PLAYING:
-        jogo.run()
-
-    elif GAME_STATE == GAME_STATE_DIFFICULTY:
-        dificuldade.run()
-        jogo = Jogar(janela) 
+    def _save_score(self):
+        if not self.player_name:
+            return
+            
+        diff_map = {DIFFICULTY_EASY: "Facil", DIFFICULTY_MEDIUM: "Medio", DIFFICULTY_HARD: "Dificil"}
+        difficulty_str = diff_map.get(DIFFICULTY_LEVEL, "Desconhecido")
         
-    elif GAME_STATE == GAME_STATE_RANKING:
-        ranking.run()
+        new_entry = f"{self.player_name.replace(' ', '_')} {difficulty_str} {int(self.final_score)}\n"
+        
+        try:
+            with open(RANKING_FILE, 'a') as f:
+                f.write(new_entry)
+        except IOError:
+            print(f"Erro: Não foi possível escrever no arquivo {RANKING_FILE}")
 
-    janela.update()
+    def run(self):
+        dt = self.janela.delta_time()
+        self.cursor_timer += dt
+        self.last_key_press_time -= dt
+
+        if self.cursor_timer > 0.4:
+            self.show_cursor = not self.show_cursor
+            self.cursor_timer = 0
+            
+        if self.last_key_press_time <= 0:
+            for key in string.ascii_lowercase:
+                if self.teclado.key_pressed(key) and len(self.player_name) < 10:
+                    self.player_name += key.upper()
+                    self.last_key_press_time = self.key_repeat_delay
+                    break
+            
+            if self.teclado.key_pressed("BACKSPACE"):
+                self.player_name = self.player_name[:-1]
+                self.last_key_press_time = self.key_repeat_delay
+
+            if self.teclado.key_pressed("ENTER") and self.player_name:
+                self._save_score()
+                return GAME_STATE_RANKING
+
+        self.janela.draw_text("GAME OVER", self.janela.width/2 - 150, 150, size=60, color=(200, 0, 0), bold=True)
+        self.janela.draw_text(f"PONTUAÇÃO FINAL: {int(self.final_score)}", self.janela.width/2 - 200, 250, size=FONT_SIZE_LARGE, color=FONT_COLOR)
+        self.janela.draw_text("DIGITE SEU NOME:", self.janela.width/2 - 140, 350, size=FONT_SIZE_MEDIUM, color=FONT_COLOR)
+        
+        name_text = self.player_name
+        if self.show_cursor:
+            name_text += "_"
+            
+        self.janela.draw_text(name_text, self.janela.width/2 - (len(name_text)*12), 400, size=FONT_SIZE_LARGE, color=(255, 255, 0))
+        self.janela.draw_text("Pressione ENTER para confirmar", self.janela.width/2 - 190, 500, size=FONT_SIZE_SMALL, color=FONT_COLOR)
+
+        return GAME_STATE_GAME_OVER
+
+# --- Função Principal e Loop do Jogo ---
+
+def main():
+    """Função principal que inicializa e executa o jogo."""
+    global GAME_CURRENT_STATE
+    
+    janela = Window(WINDOW_WIDTH, WINDOW_HEIGHT)
+    janela.set_title(GAME_TITLE)
+
+    assets = AssetManager()
+    assets.set_volume(0.03)
+
+    menu_screen = Menu(janela)
+    difficulty_screen = Dificuldade(janela)
+    ranking_screen = Ranking(janela)
+    game_screen = None
+    game_over_screen = None
+    
+    final_score = 0
+
+    while GAME_CURRENT_STATE != GAME_STATE_EXIT:
+        janela.set_background_color(BACKGROUND_COLOR)
+        
+        # ALTERAÇÃO: Lógica de música simplificada para tocar continuamente
+        if not assets.background_music.is_playing():
+            assets.background_music.play()
+        
+        if GAME_CURRENT_STATE == GAME_STATE_MENU:
+            GAME_CURRENT_STATE = menu_screen.run()
+            if GAME_CURRENT_STATE == GAME_STATE_PLAYING:
+                game_screen = Jogar(janela, assets, DIFFICULTY_LEVEL)
+        
+        elif GAME_CURRENT_STATE == GAME_STATE_PLAYING:
+            if game_screen:
+                next_state, score = game_screen.run()
+                if next_state != GAME_STATE_PLAYING:
+                    final_score = score
+                    GAME_CURRENT_STATE = next_state
+                    game_screen = None
+        
+        elif GAME_CURRENT_STATE == GAME_STATE_DIFFICULTY:
+            GAME_CURRENT_STATE = difficulty_screen.run()
+
+        elif GAME_CURRENT_STATE == GAME_STATE_RANKING:
+            GAME_CURRENT_STATE = ranking_screen.run()
+        
+        elif GAME_CURRENT_STATE == GAME_STATE_GAME_OVER:
+            if not game_over_screen:
+                game_over_screen = GameOverScreen(janela, final_score)
+            GAME_CURRENT_STATE = game_over_screen.run()
+            if GAME_CURRENT_STATE != GAME_STATE_GAME_OVER:
+                game_over_screen = None
+                ranking_screen = Ranking(janela)
+
+        janela.update()
+
+if __name__ == "__main__":
+    main()
