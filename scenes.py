@@ -8,10 +8,10 @@ from PPlay.animation import *
 from PPlay.mouse import *
 
 from constants import *
-from entities import Jogador, Inimigos, PowerUp
+from entities import Jogador, Inimigos, PowerUp, Boss
 
-# --- CLASSE DE BOTÃO REUTILIZÁVEL ---
 class Button:
+    """Classe para criar botões de menu clicáveis e estilizados."""
     def __init__(self, text, x, y, width=250, height=50):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
@@ -23,7 +23,7 @@ class Button:
         bg_color = DARK_CYAN if self.is_hovered else CYAN
         pygame.draw.rect(janela.screen, bg_color, self.rect, border_radius=10)
         
-        text_color = WHITE if self.is_hovered else BACKGROUND_COLOR
+        text_color = BACKGROUND_COLOR
         text_surf = self.font.render(self.text, True, text_color)
         text_rect = text_surf.get_rect(center=self.rect.center)
         janela.screen.blit(text_surf, text_rect)
@@ -32,7 +32,7 @@ class Button:
         return self.is_hovered and mouse_is_new_click
 
 class Jogar:
-    # ... (a classe Jogar não foi alterada) ...
+    """Cena principal do jogo, onde toda a ação acontece."""
     def __init__(self, janela, assets, settings):
         self.janela = janela
         self.assets = assets
@@ -41,9 +41,18 @@ class Jogar:
         self.pontuacao = 0
         self.nivel = 1
         self.jogador = Jogador(janela, assets, settings)
-        self.inimigos = Inimigos(janela, self.nivel, settings)
         self.active_powerups = []
         self.active_explosions = []
+        
+        # Atributos para o tremor de tela
+        self.is_shaking = False
+        self.shake_duration = 0.2
+        self.shake_intensity = 4
+        self.shake_timer = 0
+        self.shake_offset_x = 0
+        self.shake_offset_y = 0
+
+        self._prepare_next_level()
         
     def _check_collisions(self):
         for linha in self.inimigos.matrizInimigos:
@@ -63,11 +72,33 @@ class Jogar:
                         break
         
         for i, tiro_inimigo in reversed(list(enumerate(self.inimigos.listaTiros))):
-            if tiro_inimigo.collided(self.jogador.player):
+            if tiro_inimigo.collided_perfect(self.jogador.player):
                 self.inimigos.listaTiros.pop(i)
                 self._handle_player_hit()
                 break
 
+        for i, powerup in reversed(list(enumerate(self.active_powerups))):
+            if powerup.collided(self.jogador.player):
+                if powerup.type_id == POWERUP_TYPE_SHIELD: self.jogador.has_shield = True; self.jogador.shield_timer = POWERUP_SHIELD_DURATION
+                else: self.jogador.is_fast_shooting = True; self.jogador.fast_shot_timer = POWERUP_FAST_SHOT_DURATION
+                self.active_powerups.pop(i)
+
+    def _check_boss_collisions(self):
+        if not self.boss: return
+
+        for j, tiro in reversed(list(enumerate(self.jogador.listaTiros))):
+            if tiro.collided_perfect(self.boss.sprite):
+                self.boss.health -= 1
+                self.pontuacao += SCORE_HIT_BOSS_BASE * self.settings["score_multiplier"]
+                self._create_explosion(tiro.x, tiro.y)
+                self.jogador.listaTiros.pop(j)
+
+        for i, tiro_inimigo in reversed(list(enumerate(self.boss.listaTiros))):
+            if tiro_inimigo.collided_perfect(self.jogador.player):
+                self.boss.listaTiros.pop(i)
+                self._handle_player_hit()
+                break
+        
         for i, powerup in reversed(list(enumerate(self.active_powerups))):
             if powerup.collided(self.jogador.player):
                 if powerup.type_id == POWERUP_TYPE_SHIELD: self.jogador.has_shield = True; self.jogador.shield_timer = POWERUP_SHIELD_DURATION
@@ -79,6 +110,9 @@ class Jogar:
             self.jogador.has_shield = False
             return
             
+        self.is_shaking = True
+        self.shake_timer = self.shake_duration
+
         self._create_explosion(self.jogador.player.x, self.jogador.player.y)
         self.assets.player_hit.play()
         self.jogador.vidas -= 1
@@ -94,19 +128,27 @@ class Jogar:
         explosion.set_position(x, y)
         self.active_explosions.append(explosion)
 
-    def _update_and_draw_effects(self, dt):
+    def _update_and_draw_effects(self, dt, offset_x=0, offset_y=0):
+        # Explosões
         self.active_explosions = [e for e in self.active_explosions if e.get_curr_frame() < e.get_final_frame() - 1]
         for e in self.active_explosions:
-            e.update(); e.draw()
+            e.update()
+            e.x += offset_x
+            e.y += offset_y
+            e.draw()
+            e.x -= offset_x
+            e.y -= offset_y
             
+        # Power-ups
         self.active_powerups = [p for p in self.active_powerups if p.y < self.janela.height]
         for p in self.active_powerups:
-            p.run(dt)
+            p.run(dt, offset_x, offset_y)
 
-    def _draw_hud(self):
+    def _draw_hud(self, offset_x=0, offset_y=0):
         table_color = CYAN
         border_width = 2
-        table_rect = pygame.Rect(5, 5, WINDOW_WIDTH - 10, 60)
+        
+        table_rect = pygame.Rect(5 + offset_x, 5 + offset_y, WINDOW_WIDTH - 10, 60)
         
         col_width = table_rect.width // 4
         
@@ -120,106 +162,160 @@ class Jogar:
         label_color = GRAY
         value_color = WHITE
 
-        self.janela.draw_text("VIDAS", 95, label_y, size=20, color=label_color, font_name=FONT_PATH)
-        self.janela.draw_text(str(self.jogador.vidas), 110, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
-        self.janela.draw_text("NÍVEL", 315, label_y, size=20, color=label_color, font_name=FONT_PATH)
-        self.janela.draw_text(str(self.nivel), 332, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
-        self.janela.draw_text("DIFICULDADE", 505, label_y, size=20, color=label_color, font_name=FONT_PATH)
-        self.janela.draw_text(self.settings['name'].upper(), 530, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
-        self.janela.draw_text("PONTOS", 750, label_y, size=20, color=label_color, font_name=FONT_PATH)
-        self.janela.draw_text(str(int(self.pontuacao)), 760, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
+        self.janela.draw_text("VIDAS", 95 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
+        self.janela.draw_text(str(self.jogador.vidas), 110 + offset_x, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
+        self.janela.draw_text("NÍVEL", 315 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
+        self.janela.draw_text(str(self.nivel), 332 + offset_x, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
+        self.janela.draw_text("DIFICULDADE", 505 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
+        self.janela.draw_text(self.settings['name'].upper(), 530 + offset_x, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
+        self.janela.draw_text("PONTOS", 750 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
+        self.janela.draw_text(str(int(self.pontuacao)), 760 + offset_x, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
+
+        if self.is_boss_fight and self.boss:
+            bar_w, bar_h, bar_x, bar_y = 400, 20, (WINDOW_WIDTH - 400) / 2, 75
+            health_perc = self.boss.health / self.boss.max_health if self.boss.max_health > 0 else 0
+            current_health_w = bar_w * health_perc
+            
+            health_bar_bg_rect = pygame.Rect(bar_x + offset_x, bar_y + offset_y, bar_w, bar_h)
+            health_bar_fg_rect = pygame.Rect(bar_x + offset_x, bar_y + offset_y, current_health_w, bar_h)
+
+            pygame.draw.rect(self.janela.screen, (100,0,0), health_bar_bg_rect, border_radius=5)
+            pygame.draw.rect(self.janela.screen, (255,0,0), health_bar_fg_rect, border_radius=5)
+            pygame.draw.rect(self.janela.screen, WHITE, health_bar_bg_rect, 2, border_radius=5)
 
     def _check_game_over_conditions(self):
-        if self.jogador.vidas <= 0: return True
-        if self.jogador.vidas > 0:
-            for linha in self.inimigos.matrizInimigos:
-                for inimigo in linha:
-                    if (inimigo.y + inimigo.height) >= self.jogador.player.y: return True
+        if self.jogador.vidas <= 0 and not self.is_shaking: return True
+        if not self.is_boss_fight:
+            if self.jogador.vidas > 0:
+                for linha in self.inimigos.matrizInimigos:
+                    for inimigo in linha:
+                        if (inimigo.y + inimigo.height) >= self.jogador.player.y: return True
         return False
+
+    def _prepare_next_level(self):
+        self.jogador.listaTiros.clear()
+        self.active_powerups.clear()
+        self.boss = None
+        self.is_boss_fight = False
+        self.inimigos = Inimigos(self.janela, self.nivel, self.settings)
+
+        if self.nivel % 5 == 0:
+            self.is_boss_fight = True
+            self.boss = Boss(self.janela, self.nivel, self.settings)
+            self.inimigos.matrizInimigos.clear() 
 
     def _level_up(self):
         self.pontuacao += SCORE_PASS_LEVEL_BASE * self.nivel * self.settings["score_multiplier"]
         self.nivel += 1
-        self.jogador.listaTiros.clear()
-        self.active_powerups.clear()
-        self.inimigos = Inimigos(self.janela, self.nivel, self.settings)
+        self._prepare_next_level()
 
     def run(self):
+        dt = self.janela.delta_time()
+
+        if self.is_shaking:
+            self.shake_timer -= dt
+            if self.shake_timer > 0:
+                self.shake_offset_x = random.randint(-self.shake_intensity, self.shake_intensity)
+                self.shake_offset_y = random.randint(-self.shake_intensity, self.shake_intensity)
+            else:
+                self.is_shaking = False
+                self.shake_offset_x = 0
+                self.shake_offset_y = 0
+        
         if self.teclado.key_pressed("ESC"):
             return GAME_STATE_MENU, self.pontuacao
             
-        dt = self.janela.delta_time()
-        self.jogador.run()
-        self.inimigos.run()
-        self._check_collisions()
-        self._update_and_draw_effects(dt)
-        self._draw_hud()
+        self.jogador.run(self.shake_offset_x, self.shake_offset_y)
+        
+        if self.is_boss_fight:
+            if self.boss:
+                self.boss.run(dt, self.shake_offset_x, self.shake_offset_y)
+                self._check_boss_collisions()
+                if self.boss.health <= 0:
+                    self.pontuacao += SCORE_BOSS_DEFEAT_BASE * self.nivel * self.settings["score_multiplier"]
+                    self._create_explosion(self.boss.sprite.x, self.boss.sprite.y)
+                    self.assets.enemy_explosion.play()
+                    self._level_up()
+        else:
+            self.inimigos.run(self.shake_offset_x, self.shake_offset_y)
+            self._check_collisions()
+            if self.inimigos.quantidade_total == 0:
+                self._level_up()
+        
+        self._update_and_draw_effects(dt, self.shake_offset_x, self.shake_offset_y)
+        self._draw_hud(self.shake_offset_x, self.shake_offset_y)
 
         if self._check_game_over_conditions():
             return GAME_STATE_GAME_OVER, self.pontuacao
             
-        if self.inimigos.quantidade_total == 0:
-            self._level_up()
-
         return GAME_STATE_PLAYING, self.pontuacao
 
 class Menu:
-    # ... (a classe Menu não foi alterada) ...
     def __init__(self, janela):
         self.janela = janela
-        self.background = GameImage(MENU_BACKGROUND_PATH)
         self.mouse = Mouse()
-        self.play_coords = (335, 180, 567, 230)
-        self.diff_coords = (335, 265, 567, 315)
-        self.rank_coords = (335, 350, 567, 400)
-        self.exit_coords = (335, 435, 567, 485)
+        self.font_title = pygame.font.Font(FONT_PATH, 70)
+        
+        btn_x = (WINDOW_WIDTH / 2) - 125
+        self.buttons = [
+            Button("Jogar", btn_x, 200),
+            Button("Dificuldade", btn_x, 270),
+            Button("Ranking", btn_x, 340),
+            Button("Sair", btn_x, 410)
+        ]
 
     def run(self, is_new_click):
-        self.background.draw()
+        title_surf = self.font_title.render(GAME_TITLE, True, CYAN)
+        title_rect = title_surf.get_rect(center=(WINDOW_WIDTH / 2, 80))
+        self.janela.screen.blit(title_surf, title_rect)
         
-        if is_new_click:
-            if self.mouse.is_over_area(start_point=(self.play_coords[0], self.play_coords[1]), end_point=(self.play_coords[2], self.play_coords[3])):
-                return GAME_STATE_PLAYING
-            if self.mouse.is_over_area(start_point=(self.diff_coords[0], self.diff_coords[1]), end_point=(self.diff_coords[2], self.diff_coords[3])):
-                return GAME_STATE_DIFFICULTY
-            if self.mouse.is_over_area(start_point=(self.rank_coords[0], self.rank_coords[1]), end_point=(self.rank_coords[2], self.rank_coords[3])):
-                return GAME_STATE_RANKING
-            if self.mouse.is_over_area(start_point=(self.exit_coords[0], self.exit_coords[1]), end_point=(self.exit_coords[2], self.exit_coords[3])):
-                return GAME_STATE_EXIT
+        for btn in self.buttons:
+            btn.draw(self.janela, self.mouse)
+            
+        if self.buttons[0].is_clicked(is_new_click): return GAME_STATE_PLAYING
+        if self.buttons[1].is_clicked(is_new_click): return GAME_STATE_DIFFICULTY
+        if self.buttons[2].is_clicked(is_new_click): return GAME_STATE_RANKING
+        if self.buttons[3].is_clicked(is_new_click): return GAME_STATE_EXIT
                 
         return GAME_STATE_MENU
 
 class Dificuldade:
-    # ... (a classe Dificuldade não foi alterada) ...
     def __init__(self, janela):
         self.janela = janela
-        self.background = GameImage(DIFFICULTY_BACKGROUND_PATH)
         self.mouse = Mouse()
         self.teclado = janela.get_keyboard()
-        self.easy_coords = (241, 180, 470, 230)
-        self.medium_coords = (241, 265, 470, 315)
-        self.hard_coords = (335, 350, 470, 410)
+        self.font_title = pygame.font.Font(FONT_PATH, 70)
 
+        btn_x = (WINDOW_WIDTH / 2) - 125
+        self.buttons = [
+            Button("Facil", btn_x, 200),
+            Button("Medio", btn_x, 270),
+            Button("Dificil", btn_x, 340),
+            Button("Voltar", btn_x, 430)
+        ]
+        
     def run(self, is_new_click, game_state):
-        self.background.draw()
+        title_surf = self.font_title.render("DIFICULDADE", True, CYAN)
+        title_rect = title_surf.get_rect(center=(WINDOW_WIDTH / 2, 80))
+        self.janela.screen.blit(title_surf, title_rect)
 
-        if is_new_click:
-            if self.mouse.is_over_area(start_point=(self.easy_coords[0], self.easy_coords[1]), end_point=(self.easy_coords[2], self.easy_coords[3])):
-                game_state["difficulty"] = DIFFICULTY_EASY
-                return GAME_STATE_MENU
-            if self.mouse.is_over_area(start_point=(self.medium_coords[0], self.medium_coords[1]), end_point=(self.medium_coords[2], self.medium_coords[3])):
-                game_state["difficulty"] = DIFFICULTY_MEDIUM
-                return GAME_STATE_MENU
-            if self.mouse.is_over_area(start_point=(self.hard_coords[0], self.hard_coords[1]), end_point=(self.hard_coords[2], self.hard_coords[3])):
-                game_state["difficulty"] = DIFFICULTY_HARD
-                return GAME_STATE_MENU
-            
-        if self.teclado.key_pressed("ESC"):
+        for btn in self.buttons:
+            btn.draw(self.janela, self.mouse)
+
+        if self.buttons[0].is_clicked(is_new_click):
+            game_state["difficulty"] = DIFFICULTY_EASY
+            return GAME_STATE_MENU
+        if self.buttons[1].is_clicked(is_new_click):
+            game_state["difficulty"] = DIFFICULTY_MEDIUM
+            return GAME_STATE_MENU
+        if self.buttons[2].is_clicked(is_new_click):
+            game_state["difficulty"] = DIFFICULTY_HARD
+            return GAME_STATE_MENU
+        if self.buttons[3].is_clicked(is_new_click) or self.teclado.key_pressed("ESC"):
             return GAME_STATE_MENU
             
         return GAME_STATE_DIFFICULTY
 
-# --- CLASSE RANKING TOTALMENTE REFORMULADA ---
 class Ranking:
     def __init__(self, janela):
         self.janela = janela
@@ -227,7 +323,6 @@ class Ranking:
         self.mouse = Mouse()
         self.scores = self._load_scores()
         
-        # Elementos visuais
         self.font_title = pygame.font.Font(FONT_PATH, 70)
         self.font_header = pygame.font.Font(FONT_PATH, 24)
         self.font_entry = pygame.font.Font(FONT_PATH, 28)
@@ -248,12 +343,10 @@ class Ranking:
         return sorted(scores_data, key=lambda x: x['score'], reverse=True)
 
     def run(self, is_new_click):
-        # Título
         title_surf = self.font_title.render("RANKING", True, CYAN)
         title_rect = title_surf.get_rect(center=(WINDOW_WIDTH / 2, 80))
         self.janela.screen.blit(title_surf, title_rect)
         
-        # Cabeçalho da Tabela
         header_y = 180
         pygame.draw.line(self.janela.screen, GRAY, (100, header_y + 30), (WINDOW_WIDTH - 100, header_y + 30), 2)
         self.janela.draw_text("POS", 110, header_y, size=24, color=GRAY, font_name=FONT_PATH)
@@ -261,7 +354,6 @@ class Ranking:
         self.janela.draw_text("PONTOS", 470, header_y, size=24, color=GRAY, font_name=FONT_PATH)
         self.janela.draw_text("DIFICULDADE", 650, header_y, size=24, color=GRAY, font_name=FONT_PATH)
 
-        # Entradas do Ranking
         if not self.scores:
             self.janela.draw_text("Nenhuma pontuacao registrada.", 220, 280, size=30, color=WHITE, font_name=FONT_PATH)
         else:
@@ -269,20 +361,15 @@ class Ranking:
                 entry_y = 240 + i * 50
                 color = CYAN if i == 0 else WHITE
 
-                # Usando pygame.font para alinhar melhor
                 pos_surf = self.font_entry.render(f"{i+1}.", True, color)
                 self.janela.screen.blit(pos_surf, (120, entry_y))
-
                 name_surf = self.font_entry.render(entry['name'], True, color)
                 self.janela.screen.blit(name_surf, (220, entry_y))
-                
                 score_surf = self.font_entry.render(str(entry['score']), True, color)
                 self.janela.screen.blit(score_surf, (470, entry_y))
-
                 diff_surf = self.font_entry.render(entry['difficulty'], True, color)
                 self.janela.screen.blit(diff_surf, (650, entry_y))
 
-        # Botão de Voltar
         self.back_button.draw(self.janela, self.mouse)
         if self.back_button.is_clicked(is_new_click) or self.teclado.key_pressed("ESC"):
             return GAME_STATE_MENU
@@ -290,7 +377,6 @@ class Ranking:
         return GAME_STATE_RANKING
 
 class GameOverScreen:
-    # ... (a classe GameOverScreen não foi alterada) ...
     def __init__(self, janela, final_score, difficulty_level):
         self.janela = janela
         self.teclado = janela.get_keyboard()

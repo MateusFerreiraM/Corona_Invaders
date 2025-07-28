@@ -5,6 +5,7 @@ from asset_manager import AssetManager
 from scenes import Menu, Dificuldade, Ranking, Jogar, GameOverScreen
 
 def main():
+    """Função principal que inicializa e executa o loop do jogo."""
     janela = Window(WINDOW_WIDTH, WINDOW_HEIGHT)
     janela.set_title(GAME_TITLE)
 
@@ -14,13 +15,11 @@ def main():
     mouse = Mouse()
     mouse_was_pressed = False
     
-    # Dicionário central para o estado do jogo
     game_state = {
         "current_scene": GAME_STATE_MENU,
         "difficulty": DIFFICULTY_MEDIUM
     }
     
-    # Instâncias das cenas
     menu_screen = Menu(janela)
     difficulty_screen = Dificuldade(janela)
     
@@ -28,6 +27,7 @@ def main():
     game_over_instance = None
     final_score = 0
 
+    # Loop principal do jogo
     while game_state["current_scene"] != GAME_STATE_EXIT:
         janela.set_background_color(BACKGROUND_COLOR)
         
@@ -40,12 +40,11 @@ def main():
 
         current_scene_key = game_state["current_scene"]
 
+        # Gerenciador de Cenas (State Machine)
         if current_scene_key == GAME_STATE_MENU:
             game_state["current_scene"] = menu_screen.run(is_new_click)
         
         elif current_scene_key == GAME_STATE_DIFFICULTY:
-            # --- CORREÇÃO APLICADA AQUI ---
-            # Passa o dicionário game_state para a função run
             game_state["current_scene"] = difficulty_screen.run(is_new_click, game_state)
 
         elif current_scene_key == GAME_STATE_PLAYING:
@@ -65,7 +64,6 @@ def main():
         
         elif current_scene_key == GAME_STATE_GAME_OVER:
             if not game_over_instance:
-                # Passa a dificuldade atual para a tela de game over
                 game_over_instance = GameOverScreen(janela, final_score, game_state["difficulty"])
             
             next_scene = game_over_instance.run()

@@ -2,6 +2,7 @@ from PPlay.sound import *
 from constants import *
 
 class AssetManager:
+    """Carrega e gerencia todos os assets de áudio do jogo."""
     def __init__(self):
         self.player_shoot = Sound(SOUND_PLAYER_SHOOT_PATH)
         self.player_hit = Sound(SOUND_PLAYER_HIT_PATH)

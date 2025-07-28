@@ -1,22 +1,20 @@
-# --- Constantes de Configuração ---
+# --- Constantes de Configuração Geral ---
 WINDOW_WIDTH = 900
 WINDOW_HEIGHT = 600
 GAME_TITLE = "Corona Invaders"
-BACKGROUND_COLOR = (2, 4, 28) 
 ASSET_PATH = "assets/"
+IMAGES_PATH = "images/"
+SOUNDS_PATH = "sounds/"
 RANKING_FILE = 'ranking.txt'
+GAME_VOLUME = 0.03
 
-# --- Cores ---
+# --- Cores e Fonte ---
+BACKGROUND_COLOR = (2, 4, 28) 
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 CYAN = (0, 255, 255)
 DARK_CYAN = (0, 130, 130)
-
-# --- Fonte ---
-FONT_PATH = ASSET_PATH + "VCR_OSD_MONO.ttf" 
-
-# --- Ponto único para controle de volume ---
-GAME_VOLUME = 0.03
+FONT_PATH = ASSET_PATH + "font/VCR_OSD_MONO.ttf" 
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 1
@@ -31,28 +29,25 @@ DIFFICULTY_EASY = 1
 DIFFICULTY_MEDIUM = 2
 DIFFICULTY_HARD = 3
 
-# --- ESTRUTURA CENTRALIZADA DE DIFICULDADE (COM VELOCIDADE AJUSTADA) ---
+# --- Configurações de Dificuldade ---
 DIFFICULTY_SETTINGS = {
     DIFFICULTY_EASY: {
         "name": "Facil", "player_lives": 7, "enemy_base_rows": 2, "enemy_base_cols": 6,
-        "enemy_move_speed_mult": 0.8, 
-        "enemy_bullet_speed_mult": 0.7,  # <--- VALOR AJUSTADO
+        "enemy_move_speed_mult": 0.8, "enemy_bullet_speed_mult": 0.7,
         "cols_increase_per_level": 0, "levels_per_row_increase": 0,
         "enemy_shot_cooldown_factor": 1.5, "simultaneous_shots": 1,
         "powerup_drop_chance": 0.15, "score_multiplier": 1.0,
     },
     DIFFICULTY_MEDIUM: {
         "name": "Medio", "player_lives": 5, "enemy_base_rows": 3, "enemy_base_cols": 6,
-        "enemy_move_speed_mult": 1.0, 
-        "enemy_bullet_speed_mult": 1.0,  # <--- VALOR MANTIDO COMO BASE
+        "enemy_move_speed_mult": 1.0, "enemy_bullet_speed_mult": 1.0,
         "cols_increase_per_level": 1, "levels_per_row_increase": 0,
         "enemy_shot_cooldown_factor": 1.0, "simultaneous_shots": 1,
         "powerup_drop_chance": 0.10, "score_multiplier": 1.5,
     },
     DIFFICULTY_HARD: {
         "name": "Dificil", "player_lives": 3, "enemy_base_rows": 3, "enemy_base_cols": 8,
-        "enemy_move_speed_mult": 1.25, 
-        "enemy_bullet_speed_mult": 1.5,  # <--- VALOR AJUSTADO
+        "enemy_move_speed_mult": 1.25, "enemy_bullet_speed_mult": 1.5,
         "cols_increase_per_level": 1, "levels_per_row_increase": 2,
         "enemy_shot_cooldown_factor": 0.7, "simultaneous_shots": 2,
         "powerup_drop_chance": 0.05, "score_multiplier": 2.0,
@@ -60,25 +55,24 @@ DIFFICULTY_SETTINGS = {
 }
 
 # --- Caminhos dos Assets ---
-MUSIC_BACKGROUND_PATH = ASSET_PATH + "game_music.ogg"
-SOUND_PLAYER_SHOOT_PATH = ASSET_PATH + "player_shoot.ogg"
-SOUND_ENEMY_EXPLOSION_PATH = ASSET_PATH + "enemy_explosion.ogg"
-SOUND_PLAYER_HIT_PATH = ASSET_PATH + "player_hit.ogg"
-PLAYER_SPRITE_PATH = ASSET_PATH + "nave.png"
-PLAYER_SHIELD_SPRITE_PATH = ASSET_PATH + "player_shield.png"
-PLAYER_DEATH_ANIM_PATH = ASSET_PATH + "jogo_jogador-respawn.png"
-ENEMY_SPRITE_PATH = ASSET_PATH + "corona.png"
-PLAYER_BULLET_PATH = ASSET_PATH + "gota.png"
-POWERUP_BULLET_PATH = ASSET_PATH + "powerup_gota.png"
-ENEMY_BULLET_PATH = ASSET_PATH + "tirocorona.png"
-POWERUP_SHIELD_PATH = ASSET_PATH + "powerup_shield.png"
-POWERUP_FAST_SHOT_PATH = ASSET_PATH + "powerup_gota.png"
-MENU_BACKGROUND_PATH = ASSET_PATH + "menu.png"
-DIFFICULTY_BACKGROUND_PATH = ASSET_PATH + "dificuldade.png"
-RANKING_TITLE_PATH = ASSET_PATH + "ranking_titulo.png"
+MUSIC_BACKGROUND_PATH = ASSET_PATH + SOUNDS_PATH + "game_music.ogg"
+SOUND_PLAYER_SHOOT_PATH = ASSET_PATH + SOUNDS_PATH + "player_shoot.ogg"
+SOUND_ENEMY_EXPLOSION_PATH = ASSET_PATH + SOUNDS_PATH + "enemy_explosion.ogg"
+SOUND_PLAYER_HIT_PATH = ASSET_PATH + SOUNDS_PATH + "player_hit.ogg"
+PLAYER_SPRITE_PATH = ASSET_PATH + IMAGES_PATH + "nave.png"
+PLAYER_SHIELD_SPRITE_PATH = ASSET_PATH + IMAGES_PATH + "player_shield.png"
+PLAYER_DEATH_ANIM_PATH = ASSET_PATH + IMAGES_PATH + "jogo_jogador-respawn.png"
+ENEMY_SPRITE_PATH = ASSET_PATH + IMAGES_PATH + "corona.png"
+BOSS_SPRITE_PATH = ASSET_PATH + IMAGES_PATH + "boss.png"
+PLAYER_BULLET_PATH = ASSET_PATH + IMAGES_PATH + "gota.png"
+POWERUP_BULLET_PATH = ASSET_PATH + IMAGES_PATH + "powerup_gota.png"
+ENEMY_BULLET_PATH = ASSET_PATH + IMAGES_PATH + "tirocorona.png"
+POWERUP_SHIELD_PATH = ASSET_PATH + IMAGES_PATH + "powerup_shield.png"
+POWERUP_FAST_SHOT_PATH = ASSET_PATH + IMAGES_PATH + "powerup_gota.png"
+MENU_BACKGROUND_PATH = ASSET_PATH + IMAGES_PATH + "menu.png"
+DIFFICULTY_BACKGROUND_PATH = ASSET_PATH + IMAGES_PATH + "dificuldade.png"
 
-
-# --- Constantes de Gameplay (Valores base) ---
+# --- Constantes de Gameplay ---
 PLAYER_SPEED = 600
 PLAYER_SHOOT_COOLDOWN = 0.5
 ENEMY_MOVEMENT_BASE_SPEED = 120
@@ -90,7 +84,9 @@ POWERUP_SPEED = 100
 POWERUP_SHIELD_DURATION = 5.0
 POWERUP_FAST_SHOT_DURATION = 5.0
 SCORE_HIT_ENEMY_BASE = 25
+SCORE_HIT_BOSS_BASE = 50
 SCORE_PASS_LEVEL_BASE = 1000
+SCORE_BOSS_DEFEAT_BASE = 5000
 ENEMY_SPACING = 15
 POWERUP_TYPE_SHIELD = 0
 POWERUP_TYPE_FAST_SHOT = 1
