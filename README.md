@@ -46,7 +46,7 @@ Siga os passos abaixo para rodar o Corona Invaders na sua máquina local.
 
 1.  **Clone o repositório:**
     ```sh
-    git clone [https://github.com/MateusFerreiraM/Corona_Invaders.git](https://github.com/MateusFerreiraM/Corona_Invaders.git)
+    git clone https://github.com/MateusFerreiraM/Corona_Invaders.git
     cd Corona_Invaders
     ```
 
