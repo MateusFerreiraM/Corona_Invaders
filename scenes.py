@@ -59,7 +59,7 @@ class Jogar:
         self.pause_buttons = [
             Button("Continuar", btn_x, 220),
             Button("Reiniciar", btn_x, 290),
-            Button("Sair para o Menu", btn_x, 360)
+            Button("Menu", btn_x, 360)
         ]
         
         self._prepare_next_level()

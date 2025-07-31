@@ -43,8 +43,8 @@ DIFFICULTY_SETTINGS = {
     DIFFICULTY_EASY: {
         "name": "Fácil", "player_lives": 6, "enemy_base_rows": 2, "enemy_base_cols": 6,
         "enemy_move_speed_mult": 0.8, "enemy_bullet_speed_mult": 0.85,
-        "cols_increase_per_level": 0, "levels_per_row_increase": 0,
-        "enemy_shot_cooldown_factor": 1.25, "simultaneous_shots": 1,
+        "cols_increase_per_level": 0, "levels_per_row_increase": 4,
+        "enemy_shot_cooldown_factor": 1.2, "simultaneous_shots": 1,
         "powerup_drop_chance": 0.15, "score_multiplier": 1.0,
     },
     DIFFICULTY_MEDIUM: {
