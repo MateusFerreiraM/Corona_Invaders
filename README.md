@@ -81,6 +81,7 @@ Siga os passos abaixo para rodar o Corona Invaders na sua máquina local.
 ---
 
 ## 📂 Estrutura de Arquivos
+```
 .
 ├── assets/
 │   ├── font/
@@ -93,8 +94,7 @@ Siga os passos abaixo para rodar o Corona Invaders na sua máquina local.
 ├── scenes.py
 ├── requirements.txt
 └── README.md
-
----
+```
 
 ## 📄 Licença
 
