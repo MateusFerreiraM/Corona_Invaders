@@ -3,6 +3,14 @@ from PPlay.sprite import *
 from PPlay.animation import *
 from constants import *
 
+def draw_with_offset(drawable, offset_x, offset_y):
+    """Função auxiliar para desenhar um objeto com o deslocamento do tremor de tela."""
+    drawable.x += offset_x
+    drawable.y += offset_y
+    drawable.draw()
+    drawable.x -= offset_x
+    drawable.y -= offset_y
+
 class Jogador:
     """Gerencia o estado e as ações do jogador."""
     def __init__(self, janela, assets, settings):
@@ -30,16 +38,19 @@ class Jogador:
         self.listaTiros.append(tiro)
         self.assets.player_shoot.play()
 
-    def run(self, offset_x=0, offset_y=0):
-        dt = self.janela.delta_time()
-        if self.teclado.key_pressed("LEFT"): self.player.x -= PLAYER_SPEED * dt
-        if self.teclado.key_pressed("RIGHT"): self.player.x += PLAYER_SPEED * dt
+    def update(self, dt):
+        """Atualiza a lógica do jogador (movimento, tiros, timers)."""
+        if self.teclado.key_pressed("LEFT") or self.teclado.key_pressed("A"):
+            self.player.x -= PLAYER_SPEED * dt
+        if self.teclado.key_pressed("RIGHT") or self.teclado.key_pressed("D"):
+            self.player.x += PLAYER_SPEED * dt
         self.player.x = max(0, min(self.player.x, self.janela.width - self.player.width))
 
         self.cronometroTiros += dt
         cooldown = PLAYER_SHOOT_COOLDOWN * (0.5 if self.is_fast_shooting else 1)
         if self.teclado.key_pressed("SPACE") and self.cronometroTiros >= cooldown:
-            self.atirar(); self.cronometroTiros = 0
+            self.atirar()
+            self.cronometroTiros = 0
 
         if self.has_shield:
             self.shield_timer -= dt
@@ -51,28 +62,19 @@ class Jogador:
         self.listaTiros = [tiro for tiro in self.listaTiros if tiro.y > -tiro.height]
         for tiro in self.listaTiros:
             tiro.move_y(BULLET_SPEED_PLAYER * dt)
-            tiro.x += offset_x
-            tiro.y += offset_y
-            tiro.draw()
-            tiro.x -= offset_x
-            tiro.y -= offset_y
-            
-        self.player.x += offset_x
-        self.player.y += offset_y
-        self.player.draw()
-        self.player.x -= offset_x
-        self.player.y -= offset_y
 
+    def draw(self, offset_x=0, offset_y=0):
+        """Desenha o jogador, seus tiros e o escudo na tela."""
+        for tiro in self.listaTiros:
+            draw_with_offset(tiro, offset_x, offset_y)
+        
+        draw_with_offset(self.player, offset_x, offset_y)
         if self.has_shield:
             self.shield_sprite.set_position(self.player.x + (self.player.width - self.shield_sprite.width) / 2, self.player.y + (self.player.height - self.shield_sprite.height) / 2)
-            self.shield_sprite.x += offset_x
-            self.shield_sprite.y += offset_y
-            self.shield_sprite.draw()
-            self.shield_sprite.x -= offset_x
-            self.shield_sprite.y -= offset_y
+            draw_with_offset(self.shield_sprite, offset_x, offset_y)
 
 class Inimigos:
-    """Gerencia a criação, movimento e ações dos inimigos."""
+    """Gerencia a criação, movimento e ações de todos os inimigos normais."""
     def __init__(self, janela, nivel, settings):
         self.janela = janela
         self.nivel = nivel
@@ -84,6 +86,7 @@ class Inimigos:
         self.spawn()
 
     def spawn(self):
+        """Cria a matriz de inimigos com base no nível e dificuldade."""
         self.matrizInimigos = []
         
         cols_adicionais = (self.nivel - 1) * self.settings["cols_increase_per_level"]
@@ -93,12 +96,12 @@ class Inimigos:
         cols = self.settings["enemy_base_cols"] + cols_adicionais
         rows = self.settings["enemy_base_rows"] + rows_adicionais
         
-        max_cols = (self.janela.width // (Sprite(ENEMY_SPRITE_PATH).width + ENEMY_SPACING)) - 1
+        temp_enemy_frame = Sprite(ENEMY_SPRITE_PATH)
+        max_cols = (self.janela.width // (temp_enemy_frame.width + ENEMY_SPACING)) - 1
         cols = min(cols, max_cols)
 
-        temp_enemy = Sprite(ENEMY_SPRITE_PATH)
-        enemy_w = temp_enemy.width + ENEMY_SPACING
-        enemy_h = temp_enemy.height + ENEMY_SPACING
+        enemy_w = temp_enemy_frame.width + ENEMY_SPACING
+        enemy_h = temp_enemy_frame.height + ENEMY_SPACING
 
         grid_width = cols * enemy_w
         start_x = (self.janela.width - grid_width) / 2
@@ -115,13 +118,14 @@ class Inimigos:
     def quantidade_total(self):
         return sum(len(linha) for linha in self.matrizInimigos)
 
-    def run(self, offset_x=0, offset_y=0):
-        dt = self.janela.delta_time()
+    def update(self, dt):
+        """Atualiza a lógica dos inimigos (movimento, timers, tiros)."""
         qtd_inimigos = self.quantidade_total
         if qtd_inimigos == 0: return
 
-        move_speed = (ENEMY_MOVEMENT_BASE_SPEED * 0.6) * self.settings["enemy_move_speed_mult"]
-        speed_multiplier = (move_speed + self.nivel * 10 + 200 / qtd_inimigos)
+        # --- Movimento da Horda ---
+        move_speed = ENEMY_MOVEMENT_BASE_SPEED * self.settings["enemy_move_speed_mult"]
+        speed_multiplier = (move_speed + self.nivel * 10 + 200 / qtd_inimigos) if qtd_inimigos > 0 else move_speed
         vx = self.direcao * speed_multiplier * dt
         
         chegou_na_borda = False
@@ -135,19 +139,23 @@ class Inimigos:
             self.direcao *= -1
             descida_y = ENEMY_ADVANCE_Y_OFFSET + self.nivel
             
+            # --- LÓGICA DE CORREÇÃO (OVERSHOOT) CONSERTADA ---
             overshoot = 0
+            # Se a direção agora é DIREITA (acabou de bater na esquerda)
             if self.direcao == 1:
                 min_x = min(i.x for l in self.matrizInimigos for i in l)
-                overshoot = 0 - min_x
+                overshoot = 0 - min_x # Calcula a correção positiva
+            # Se a direção agora é ESQUERDA (acabou de bater na direita)
             else:
                 max_x = max(i.x + i.width for l in self.matrizInimigos for i in l)
-                overshoot = max_x - self.janela.width
-            
+                overshoot = self.janela.width - max_x # Calcula a correção negativa
+
             for linha in self.matrizInimigos:
                 for inimigo in linha:
                     inimigo.y += descida_y
-                    inimigo.x += self.direcao * overshoot
+                    inimigo.x += overshoot
 
+        # --- Controle de Tiros ---
         self.cronometroTiro += dt
         cooldown = (ENEMY_SHOT_COOLDOWN_BASE - self.nivel * 0.1) * self.settings["enemy_shot_cooldown_factor"]
         if self.cronometroTiro > max(0.3, cooldown):
@@ -156,30 +164,24 @@ class Inimigos:
             if atiradores_disponiveis:
                 num_tiros = min(self.settings["simultaneous_shots"], len(atiradores_disponiveis))
                 atiradores_selecionados = random.sample(atiradores_disponiveis, num_tiros)
-                
                 for atirador in atiradores_selecionados:
                     tiro = Sprite(ENEMY_BULLET_PATH)
                     tiro.set_position(atirador.x + atirador.width/2 - tiro.width/2, atirador.y + atirador.height)
                     self.listaTiros.append(tiro)
-
+        
         base_speed = ENEMY_BULLET_SPEED_BASE + (self.nivel * 10)
         v_tiro = base_speed * self.settings["enemy_bullet_speed_mult"]
         self.listaTiros = [tiro for tiro in self.listaTiros if tiro.y < self.janela.height]
         for tiro in self.listaTiros:
             tiro.move_y(v_tiro * dt)
-            tiro.x += offset_x
-            tiro.y += offset_y
-            tiro.draw()
-            tiro.x -= offset_x
-            tiro.y -= offset_y
-
+    
+    def draw(self, offset_x=0, offset_y=0):
+        """Desenha os inimigos e seus tiros."""
+        for tiro in self.listaTiros:
+            draw_with_offset(tiro, offset_x, offset_y)
         for linha in self.matrizInimigos:
             for inimigo in linha:
-                inimigo.x += offset_x
-                inimigo.y += offset_y
-                inimigo.draw()
-                inimigo.x -= offset_x
-                inimigo.y -= offset_y
+                draw_with_offset(inimigo, offset_x, offset_y)
 
 class PowerUp(Sprite):
     """Representa um item de power-up que cai na tela."""
@@ -189,11 +191,20 @@ class PowerUp(Sprite):
         self.set_position(x, y)
         self.type_id = type_id
 
-    def run(self, dt, offset_x=0, offset_y=0):
+    def update(self, dt):
+        """Atualiza a lógica do power-up (movimento)."""
         self.move_y(POWERUP_SPEED * dt)
+
+    def draw(self, offset_x=0, offset_y=0):
+        """Desenha o power-up com o deslocamento da tela, evitando recursão."""
+        # Aplica o deslocamento
         self.x += offset_x
         self.y += offset_y
-        self.draw()
+        
+        # Chama o método .draw() original da classe Sprite (classe pai)
+        super().draw()
+        
+        # Reverte o deslocamento para manter a posição lógica correta
         self.x -= offset_x
         self.y -= offset_y
 
@@ -205,21 +216,18 @@ class Boss:
         self.settings = settings
         self.sprite = Sprite(BOSS_SPRITE_PATH) 
         self.sprite.set_position(janela.width / 2 - self.sprite.width / 2, 80)
-        
         self.max_health = 20 + (nivel * 4)
         self.health = self.max_health
         self.listaTiros = []
         self.direcao = 1
         self.move_speed = (ENEMY_MOVEMENT_BASE_SPEED * 0.6) * self.settings["enemy_move_speed_mult"]
         self.shot_cooldown = max(0.8, 2.5 - (nivel * 0.1)) * self.settings["enemy_shot_cooldown_factor"]
-
         self.shot_timer = 0
         self.pattern_timer = 0
         self.pattern_duration = 7.0
         self.current_pattern = 0
 
     def _shoot_barrage(self):
-        """Atira uma rajada de 3 tiros rápidos em sequência."""
         for i in range(3):
             tiro = Sprite(ENEMY_BULLET_PATH)
             offset_x = self.sprite.x + self.sprite.width/2 - tiro.width/2
@@ -228,7 +236,6 @@ class Boss:
             self.listaTiros.append(tiro)
 
     def _shoot_spread(self):
-        """Atira 3 projéteis de uma vez em posições diferentes."""
         for i in range(-1, 2):
             tiro = Sprite(ENEMY_BULLET_PATH)
             offset_x = self.sprite.x + self.sprite.width/2 - tiro.width/2 + (i * 60)
@@ -236,7 +243,8 @@ class Boss:
             tiro.set_position(offset_x, offset_y)
             self.listaTiros.append(tiro)
 
-    def run(self, dt, offset_x=0, offset_y=0):
+    def update(self, dt):
+        """Atualiza a lógica do chefe (movimento, padrões de tiro)."""
         self.sprite.move_x(self.direcao * self.move_speed * dt)
         if self.sprite.x < 0 or (self.sprite.x + self.sprite.width) > self.janela.width:
             self.direcao *= -1
@@ -257,14 +265,9 @@ class Boss:
         self.listaTiros = [tiro for tiro in self.listaTiros if tiro.y < self.janela.height]
         for tiro in self.listaTiros:
             tiro.move_y(v_tiro * dt)
-            tiro.x += offset_x
-            tiro.y += offset_y
-            tiro.draw()
-            tiro.x -= offset_x
-            tiro.y -= offset_y
 
-        self.sprite.x += offset_x
-        self.sprite.y += offset_y
-        self.sprite.draw()
-        self.sprite.x -= offset_x
-        self.sprite.y -= offset_y
+    def draw(self, offset_x=0, offset_y=0):
+        """Desenha o chefe e seus tiros."""
+        for tiro in self.listaTiros:
+            draw_with_offset(tiro, offset_x, offset_y)
+        draw_with_offset(self.sprite, offset_x, offset_y)

@@ -11,7 +11,7 @@ from constants import *
 from entities import Jogador, Inimigos, PowerUp, Boss
 
 class Button:
-    """Classe para criar botões de menu clicáveis e estilizados."""
+    """Cria um botão de menu clicável e estilizado."""
     def __init__(self, text, x, y, width=250, height=50):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
@@ -32,7 +32,7 @@ class Button:
         return self.is_hovered and mouse_is_new_click
 
 class Jogar:
-    """Cena principal do jogo, onde toda a ação acontece."""
+    """Cena principal do jogo, onde toda a ação e lógica de gameplay acontecem."""
     def __init__(self, janela, assets, settings):
         self.janela = janela
         self.assets = assets
@@ -50,11 +50,23 @@ class Jogar:
         self.shake_intensity = 4
         self.shake_timer = 0
         self.shake_offset_x = 0
-        self.shake_offset_y = 0
+        self.shake_offset_y = 0    
 
+        # Atributos para o menu de pausa
+        self.is_paused = False
+        self.esc_was_pressed = False
+        btn_x = (WINDOW_WIDTH / 2) - 125
+        self.pause_buttons = [
+            Button("Continuar", btn_x, 220),
+            Button("Reiniciar", btn_x, 290),
+            Button("Sair para o Menu", btn_x, 360)
+        ]
+        
         self._prepare_next_level()
         
     def _check_collisions(self):
+        """Verifica e processa todas as colisões do jogo (tiros, power-ups, etc)."""
+        # Tiros do jogador vs. Inimigos
         for linha in self.inimigos.matrizInimigos:
             for i, inimigo in reversed(list(enumerate(linha))):
                 for j, tiro in reversed(list(enumerate(self.jogador.listaTiros))):
@@ -71,12 +83,14 @@ class Jogar:
                         self.jogador.listaTiros.pop(j)
                         break
         
+        # Tiros dos inimigos vs. Jogador
         for i, tiro_inimigo in reversed(list(enumerate(self.inimigos.listaTiros))):
             if tiro_inimigo.collided_perfect(self.jogador.player):
                 self.inimigos.listaTiros.pop(i)
                 self._handle_player_hit()
                 break
 
+        # Power-ups vs. Jogador
         for i, powerup in reversed(list(enumerate(self.active_powerups))):
             if powerup.collided(self.jogador.player):
                 if powerup.type_id == POWERUP_TYPE_SHIELD: self.jogador.has_shield = True; self.jogador.shield_timer = POWERUP_SHIELD_DURATION
@@ -84,8 +98,10 @@ class Jogar:
                 self.active_powerups.pop(i)
 
     def _check_boss_collisions(self):
+        """Verifica e processa colisões específicas da batalha contra o chefe."""
         if not self.boss: return
 
+        # Tiros do jogador vs. Chefe
         for j, tiro in reversed(list(enumerate(self.jogador.listaTiros))):
             if tiro.collided_perfect(self.boss.sprite):
                 self.boss.health -= 1
@@ -93,19 +109,15 @@ class Jogar:
                 self._create_explosion(tiro.x, tiro.y)
                 self.jogador.listaTiros.pop(j)
 
+        # Tiros do chefe vs. Jogador
         for i, tiro_inimigo in reversed(list(enumerate(self.boss.listaTiros))):
             if tiro_inimigo.collided_perfect(self.jogador.player):
                 self.boss.listaTiros.pop(i)
                 self._handle_player_hit()
                 break
-        
-        for i, powerup in reversed(list(enumerate(self.active_powerups))):
-            if powerup.collided(self.jogador.player):
-                if powerup.type_id == POWERUP_TYPE_SHIELD: self.jogador.has_shield = True; self.jogador.shield_timer = POWERUP_SHIELD_DURATION
-                else: self.jogador.is_fast_shooting = True; self.jogador.fast_shot_timer = POWERUP_FAST_SHOT_DURATION
-                self.active_powerups.pop(i)
     
     def _handle_player_hit(self):
+        """Processa o que acontece quando o jogador é atingido."""
         if self.jogador.has_shield:
             self.jogador.has_shield = False
             return
@@ -123,33 +135,57 @@ class Jogar:
             self.jogador.player.set_position(-1000, -1000)
 
     def _create_explosion(self, x, y):
+        """Cria uma animação de explosão em uma dada coordenada."""
         explosion = Animation(PLAYER_DEATH_ANIM_PATH, 12, loop=False)
         explosion.set_total_duration(500)
         explosion.set_position(x, y)
         self.active_explosions.append(explosion)
 
-    def _update_and_draw_effects(self, dt, offset_x=0, offset_y=0):
-        # Explosões
+    # --- MÉTODO SEPARADO PARA ATUALIZAÇÃO ---
+    def _update_effects(self, dt):
+        """Atualiza a lógica de efeitos visuais como explosões e power-ups."""
         self.active_explosions = [e for e in self.active_explosions if e.get_curr_frame() < e.get_final_frame() - 1]
         for e in self.active_explosions:
             e.update()
-            e.x += offset_x
-            e.y += offset_y
-            e.draw()
-            e.x -= offset_x
-            e.y -= offset_y
             
-        # Power-ups
         self.active_powerups = [p for p in self.active_powerups if p.y < self.janela.height]
         for p in self.active_powerups:
-            p.run(dt, offset_x, offset_y)
+            p.update(dt) # <--- CORRIGIDO: usa .update()
+
+    # --- MÉTODO SEPARADO PARA DESENHO ---
+    def _draw_effects(self, offset_x=0, offset_y=0):
+        """Desenha efeitos visuais como explosões e power-ups."""
+        from entities import draw_with_offset
+        for e in self.active_explosions:
+            draw_with_offset(e, offset_x, offset_y)
+            
+        for p in self.active_powerups:
+            p.draw(offset_x, offset_y) # <--- CORRIGIDO: usa .draw()
+
+    def _draw_pause_menu(self):
+        """Desenha a sobreposição escura e os botões do menu de pausa."""
+        overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        self.janela.screen.blit(overlay, (0, 0))
+        mouse = Mouse()
+        for btn in self.pause_buttons:
+            btn.draw(self.janela, mouse)
+
+    def _handle_pause_input(self, is_new_click):
+        """Verifica cliques nos botões de pausa e retorna o estado de jogo apropriado."""
+        if self.pause_buttons[0].is_clicked(is_new_click):
+            self.is_paused = False
+        if self.pause_buttons[1].is_clicked(is_new_click):
+            return GAME_STATE_RESTART, 0
+        if self.pause_buttons[2].is_clicked(is_new_click):
+            return GAME_STATE_MENU, self.pontuacao
+        return None, None
 
     def _draw_hud(self, offset_x=0, offset_y=0):
+        """Desenha a interface do usuário (vidas, pontos, nível, etc.)."""
         table_color = CYAN
         border_width = 2
-        
         table_rect = pygame.Rect(5 + offset_x, 5 + offset_y, WINDOW_WIDTH - 10, 60)
-        
         col_width = table_rect.width // 4
         
         pygame.draw.rect(self.janela.screen, table_color, table_rect, border_width, border_radius=5)
@@ -157,11 +193,10 @@ class Jogar:
             div_x = table_rect.x + col_width * i
             pygame.draw.line(self.janela.screen, table_color, (div_x, table_rect.y), (div_x, table_rect.y + table_rect.height), border_width)
 
-        label_y = table_rect.y + 8
-        value_y = table_rect.y + 30
-        label_color = GRAY
-        value_color = WHITE
+        label_y, value_y = table_rect.y + 8, table_rect.y + 30
+        label_color, value_color = GRAY, WHITE
 
+        # Desenha os textos do HUD
         self.janela.draw_text("VIDAS", 95 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
         self.janela.draw_text(str(self.jogador.vidas), 110 + offset_x, value_y, size=24, color=value_color, bold=True, font_name=FONT_PATH)
         self.janela.draw_text("NÍVEL", 315 + offset_x, label_y, size=20, color=label_color, font_name=FONT_PATH)
@@ -175,7 +210,6 @@ class Jogar:
             bar_w, bar_h, bar_x, bar_y = 400, 20, (WINDOW_WIDTH - 400) / 2, 75
             health_perc = self.boss.health / self.boss.max_health if self.boss.max_health > 0 else 0
             current_health_w = bar_w * health_perc
-            
             health_bar_bg_rect = pygame.Rect(bar_x + offset_x, bar_y + offset_y, bar_w, bar_h)
             health_bar_fg_rect = pygame.Rect(bar_x + offset_x, bar_y + offset_y, current_health_w, bar_h)
 
@@ -184,6 +218,7 @@ class Jogar:
             pygame.draw.rect(self.janela.screen, WHITE, health_bar_bg_rect, 2, border_radius=5)
 
     def _check_game_over_conditions(self):
+        """Verifica as condições de fim de jogo."""
         if self.jogador.vidas <= 0 and not self.is_shaking: return True
         if not self.is_boss_fight:
             if self.jogador.vidas > 0:
@@ -193,6 +228,7 @@ class Jogar:
         return False
 
     def _prepare_next_level(self):
+        """Prepara o próximo nível, criando inimigos normais ou um chefe."""
         self.jogador.listaTiros.clear()
         self.active_powerups.clear()
         self.boss = None
@@ -205,13 +241,20 @@ class Jogar:
             self.inimigos.matrizInimigos.clear() 
 
     def _level_up(self):
+        """Avança para o próximo nível e atualiza a pontuação."""
         self.pontuacao += SCORE_PASS_LEVEL_BASE * self.nivel * self.settings["score_multiplier"]
         self.nivel += 1
         self._prepare_next_level()
 
-    def run(self):
-        dt = self.janela.delta_time()
+    def run(self, is_new_click):
+        """Loop principal da cena de jogo, chamado a cada frame."""
+        # --- Atualização de Estados (Pausa e Tremor) ---
+        esc_is_pressed = self.teclado.key_pressed("ESC")
+        if esc_is_pressed and not self.esc_was_pressed:
+            self.is_paused = not self.is_paused
+        self.esc_was_pressed = esc_is_pressed
 
+        dt = self.janela.delta_time()
         if self.is_shaking:
             self.shake_timer -= dt
             if self.shake_timer > 0:
@@ -219,38 +262,54 @@ class Jogar:
                 self.shake_offset_y = random.randint(-self.shake_intensity, self.shake_intensity)
             else:
                 self.is_shaking = False
-                self.shake_offset_x = 0
-                self.shake_offset_y = 0
+                self.shake_offset_x, self.shake_offset_y = 0, 0
         
-        if self.teclado.key_pressed("ESC"):
-            return GAME_STATE_MENU, self.pontuacao
+        # --- Lógica de Atualização (Roda apenas se não estiver pausado) ---
+        if not self.is_paused:
+            self.jogador.update(dt)
             
-        self.jogador.run(self.shake_offset_x, self.shake_offset_y)
-        
-        if self.is_boss_fight:
-            if self.boss:
-                self.boss.run(dt, self.shake_offset_x, self.shake_offset_y)
-                self._check_boss_collisions()
-                if self.boss.health <= 0:
-                    self.pontuacao += SCORE_BOSS_DEFEAT_BASE * self.nivel * self.settings["score_multiplier"]
-                    self._create_explosion(self.boss.sprite.x, self.boss.sprite.y)
-                    self.assets.enemy_explosion.play()
+            if self.is_boss_fight:
+                if self.boss:
+                    self.boss.update(dt)
+                    self._check_boss_collisions()
+                    if self.boss.health <= 0:
+                        self.pontuacao += SCORE_BOSS_DEFEAT_BASE * self.nivel * self.settings["score_multiplier"]
+                        self._create_explosion(self.boss.sprite.x, self.boss.sprite.y)
+                        self.assets.enemy_explosion.play()
+                        self._level_up()
+            else:
+                self.inimigos.update(dt)
+                self._check_collisions()
+                if self.inimigos.quantidade_total == 0:
                     self._level_up()
-        else:
-            self.inimigos.run(self.shake_offset_x, self.shake_offset_y)
-            self._check_collisions()
-            if self.inimigos.quantidade_total == 0:
-                self._level_up()
+            
+            self._update_effects(dt) # <--- CHAMADA CORRIGIDA
         
-        self._update_and_draw_effects(dt, self.shake_offset_x, self.shake_offset_y)
+        # --- Lógica de Desenho (Sempre acontece) ---
+        self.jogador.draw(self.shake_offset_x, self.shake_offset_y)
+        if self.is_boss_fight:
+            if self.boss: self.boss.draw(self.shake_offset_x, self.shake_offset_y)
+        else:
+            self.inimigos.draw(self.shake_offset_x, self.shake_offset_y)
+        
+        self._draw_effects(self.shake_offset_x, self.shake_offset_y) # <--- NOVA CHAMADA
         self._draw_hud(self.shake_offset_x, self.shake_offset_y)
 
+        # Se pausado, desenha o menu de pausa por cima de tudo
+        if self.is_paused:
+            self._draw_pause_menu()
+            next_scene, score = self._handle_pause_input(is_new_click)
+            if next_scene:
+                return next_scene, score
+
+        # --- Verificação de Fim de Jogo ---
         if self._check_game_over_conditions():
             return GAME_STATE_GAME_OVER, self.pontuacao
             
         return GAME_STATE_PLAYING, self.pontuacao
 
 class Menu:
+    """Cena do Menu Principal."""
     def __init__(self, janela):
         self.janela = janela
         self.mouse = Mouse()
@@ -259,9 +318,10 @@ class Menu:
         btn_x = (WINDOW_WIDTH / 2) - 125
         self.buttons = [
             Button("Jogar", btn_x, 200),
-            Button("Dificuldade", btn_x, 270),
-            Button("Ranking", btn_x, 340),
-            Button("Sair", btn_x, 410)
+            Button("Como Jogar", btn_x, 270),
+            Button("Dificuldade", btn_x, 340),
+            Button("Ranking", btn_x, 410),
+            Button("Sair", btn_x, 480)
         ]
 
     def run(self, is_new_click):
@@ -273,13 +333,15 @@ class Menu:
             btn.draw(self.janela, self.mouse)
             
         if self.buttons[0].is_clicked(is_new_click): return GAME_STATE_PLAYING
-        if self.buttons[1].is_clicked(is_new_click): return GAME_STATE_DIFFICULTY
-        if self.buttons[2].is_clicked(is_new_click): return GAME_STATE_RANKING
-        if self.buttons[3].is_clicked(is_new_click): return GAME_STATE_EXIT
+        if self.buttons[1].is_clicked(is_new_click): return GAME_STATE_HOW_TO_PLAY
+        if self.buttons[2].is_clicked(is_new_click): return GAME_STATE_DIFFICULTY
+        if self.buttons[3].is_clicked(is_new_click): return GAME_STATE_RANKING
+        if self.buttons[4].is_clicked(is_new_click): return GAME_STATE_EXIT
                 
         return GAME_STATE_MENU
 
 class Dificuldade:
+    """Cena de Seleção de Dificuldade."""
     def __init__(self, janela):
         self.janela = janela
         self.mouse = Mouse()
@@ -288,9 +350,9 @@ class Dificuldade:
 
         btn_x = (WINDOW_WIDTH / 2) - 125
         self.buttons = [
-            Button("Facil", btn_x, 200),
-            Button("Medio", btn_x, 270),
-            Button("Dificil", btn_x, 340),
+            Button("Fácil", btn_x, 200),
+            Button("Médio", btn_x, 270),
+            Button("Difícil", btn_x, 340),
             Button("Voltar", btn_x, 430)
         ]
         
@@ -316,7 +378,82 @@ class Dificuldade:
             
         return GAME_STATE_DIFFICULTY
 
+class ComoJogar:
+    """Cena que explica os controles e power-ups com um layout profissional."""
+    def __init__(self, janela):
+        self.janela = janela
+        self.teclado = janela.get_keyboard()
+        self.mouse = Mouse()
+        
+        self.font_title = pygame.font.Font(FONT_PATH, 60)
+        self.font_header = pygame.font.Font(FONT_PATH, 32)
+        self.font_text = pygame.font.Font(FONT_PATH, 24)
+        
+        self.back_button = Button("Voltar", WINDOW_WIDTH / 2 - 125, 520)
+
+        self.shield_powerup_sprite = Sprite(POWERUP_SHIELD_PATH)
+        self.fastshot_powerup_sprite = Sprite(POWERUP_FAST_SHOT_PATH)
+
+    def run(self, is_new_click):
+        RED = (255, 60, 60)
+        
+        title_surf = self.font_title.render("COMO JOGAR", True, CYAN)
+        title_rect = title_surf.get_rect(center=(WINDOW_WIDTH / 2, 70))
+        self.janela.screen.blit(title_surf, title_rect)
+        
+        pygame.draw.line(self.janela.screen, GRAY, (100, 115), (WINDOW_WIDTH - 100, 115), 2)
+
+        label_x = 180
+        value_x = 450
+        current_y = 150
+        line_height = 40
+
+        # --- Seção de Controles ---
+        header_controles_surf = self.font_header.render("Controles", True, RED)
+        header_controles_rect = header_controles_surf.get_rect(center=(WINDOW_WIDTH / 2, current_y))
+        self.janela.screen.blit(header_controles_surf, header_controles_rect)
+        current_y += 50
+
+        self.janela.draw_text("Mover para a Esquerda:", label_x, current_y, font_name=FONT_PATH, size=24, color=GRAY)
+        self.janela.draw_text("SETA ESQUERDA / A", value_x, current_y, font_name=FONT_PATH, size=24, color=WHITE)
+        current_y += line_height
+
+        self.janela.draw_text("Mover para a Direita:", label_x, current_y, font_name=FONT_PATH, size=24, color=GRAY)
+        self.janela.draw_text("SETA DIREITA / D", value_x, current_y, font_name=FONT_PATH, size=24, color=WHITE)
+        current_y += line_height
+
+        self.janela.draw_text("Atirar:", label_x, current_y, font_name=FONT_PATH, size=24, color=GRAY)
+        self.janela.draw_text("BARRA DE ESPAÇO", value_x, current_y, font_name=FONT_PATH, size=24, color=WHITE)
+        current_y += 50
+        
+        pygame.draw.line(self.janela.screen, GRAY, (100, current_y), (WINDOW_WIDTH - 100, current_y), 2)
+        current_y += 40
+
+        # --- Seção de Power-Ups ---
+        header_powerups_surf = self.font_header.render("Power-Ups", True, RED)
+        header_powerups_rect = header_powerups_surf.get_rect(center=(WINDOW_WIDTH / 2, current_y))
+        self.janela.screen.blit(header_powerups_surf, header_powerups_rect)
+        current_y += 50
+
+        self.shield_powerup_sprite.set_position(label_x, current_y)
+        self.shield_powerup_sprite.draw()
+        self.janela.draw_text("Escudo:", label_x + 50, current_y + 4, font_name=FONT_PATH, size=24, color=GRAY)
+        self.janela.draw_text("Protege contra um único dano.", value_x, current_y + 4, font_name=FONT_PATH, size=24, color=WHITE)
+        current_y += line_height
+
+        self.fastshot_powerup_sprite.set_position(label_x, current_y)
+        self.fastshot_powerup_sprite.draw()
+        self.janela.draw_text("Tiro Rápido:", label_x + 50, current_y + 4, font_name=FONT_PATH, size=24, color=GRAY)
+        self.janela.draw_text("Aumenta a cadência de tiro.", value_x, current_y + 4, font_name=FONT_PATH, size=24, color=WHITE)
+        
+        self.back_button.draw(self.janela, self.mouse)
+        if self.back_button.is_clicked(is_new_click) or self.teclado.key_pressed("ESC"):
+            return GAME_STATE_MENU
+            
+        return GAME_STATE_HOW_TO_PLAY
+
 class Ranking:
+    """Cena que exibe as maiores pontuações."""
     def __init__(self, janela):
         self.janela = janela
         self.teclado = janela.get_keyboard()
@@ -329,6 +466,7 @@ class Ranking:
         self.back_button = Button("Voltar", WINDOW_WIDTH / 2 - 125, 520)
 
     def _load_scores(self):
+        """Carrega as pontuações do arquivo de ranking."""
         try:
             with open(RANKING_FILE, 'r') as f: lines = f.readlines()
         except FileNotFoundError: return []
@@ -355,7 +493,7 @@ class Ranking:
         self.janela.draw_text("DIFICULDADE", 650, header_y, size=24, color=GRAY, font_name=FONT_PATH)
 
         if not self.scores:
-            self.janela.draw_text("Nenhuma pontuacao registrada.", 220, 280, size=30, color=WHITE, font_name=FONT_PATH)
+            self.janela.draw_text("Nenhuma pontuação registrada.", 220, 280, size=30, color=WHITE, font_name=FONT_PATH)
         else:
             for i, entry in enumerate(self.scores[:5]):
                 entry_y = 240 + i * 50
@@ -377,6 +515,7 @@ class Ranking:
         return GAME_STATE_RANKING
 
 class GameOverScreen:
+    """Cena de Fim de Jogo para o jogador inserir o nome."""
     def __init__(self, janela, final_score, difficulty_level):
         self.janela = janela
         self.teclado = janela.get_keyboard()
@@ -396,6 +535,7 @@ class GameOverScreen:
         self.last_key_state = {key: False for key in self.keys_to_check}
 
     def _save_score(self):
+        """Salva a pontuação no arquivo de ranking."""
         if not self.player_name: return
         difficulty_name = DIFFICULTY_SETTINGS[self.difficulty_level]["name"]
         new_entry = f"{self.player_name.replace(' ', '_')} {difficulty_name} {int(self.final_score)}\n"
@@ -406,6 +546,7 @@ class GameOverScreen:
             print(f"Erro: Não foi possível escrever no arquivo {RANKING_FILE}")
 
     def run(self):
+        # Lógica de input para o nome do jogador
         for key in self.keys_to_check:
             key_is_pressed = self.teclado.key_pressed(key)
             if key_is_pressed and not self.last_key_state[key]:
@@ -419,11 +560,13 @@ class GameOverScreen:
                     self.player_name += key
             self.last_key_state[key] = key_is_pressed
 
+        # Lógica do cursor piscando
         self.cursor_timer += self.janela.delta_time()
         if self.cursor_timer > 0.4:
             self.show_cursor = not self.show_cursor
             self.cursor_timer = 0
             
+        # Desenho dos elementos da tela
         title_surf = self.font_title.render("GAME OVER", True, (200, 0, 0))
         title_rect = title_surf.get_rect(center=(WINDOW_WIDTH / 2, 150))
         self.janela.screen.blit(title_surf, title_rect)
