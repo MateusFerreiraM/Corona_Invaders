@@ -29,7 +29,7 @@ Um jogo de tiro espacial no estilo clássico, onde você comanda a última nave 
 * **Linguagem:** Python 3.11
 * **Bibliotecas Principais:**
     * [Pygame](https://www.pygame.org/) - A base para toda a lógica de jogo, renderização e gerenciamento de eventos.
-    * [PPlay Game Engine](https://github.com/pplay-gengine/pplay) - Uma biblioteca wrapper sobre o Pygame para facilitar a manipulação de sprites, animações, som e janelas.
+    * [PPlay Game Engine](http://www2.ic.uff.br/pplay/) - Uma biblioteca wrapper sobre o Pygame para facilitar a manipulação de sprites, animações, som e janelas.
 
 ---
 
