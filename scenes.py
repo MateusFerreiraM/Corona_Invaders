@@ -1,6 +1,7 @@
 import string
 import random
 import pygame
+import os
 from PPlay.window import *
 from PPlay.sprite import *
 from PPlay.gameimage import *
@@ -465,6 +466,14 @@ class Ranking:
         self.font_entry = pygame.font.Font(FONT_PATH, 28)
         self.back_button = Button("Voltar", WINDOW_WIDTH / 2 - 125, 520)
 
+        # --- ADICIONADO: Carregamento do troféu ---
+        try:
+            trophy_icon_path = os.path.join("assets/images/trofeu.png")
+            self.trophy_icon = pygame.image.load(trophy_icon_path).convert_alpha()
+            self.trophy_icon = pygame.transform.scale(self.trophy_icon, (30, 30))
+        except pygame.error:
+            self.trophy_icon = None
+
     def _load_scores(self):
         """Carrega as pontuações do arquivo de ranking."""
         try:
@@ -507,6 +516,11 @@ class Ranking:
                 self.janela.screen.blit(score_surf, (470, entry_y))
                 diff_surf = self.font_entry.render(entry['difficulty'], True, color)
                 self.janela.screen.blit(diff_surf, (650, entry_y))
+
+                # --- Lógica para desenhar o troféu no top 1 ---
+                if self.trophy_icon and i == 0:
+                    trophy_rect = self.trophy_icon.get_rect(midright=(110, entry_y + self.font_entry.get_height() / 2))
+                    self.janela.screen.blit(self.trophy_icon, trophy_rect)
 
         self.back_button.draw(self.janela, self.mouse)
         if self.back_button.is_clicked(is_new_click) or self.teclado.key_pressed("ESC"):

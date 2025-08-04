@@ -2,7 +2,7 @@
 
 | Tela Inicial | Partida em Andamento | Batalha de Chefe |
 |:---:|:---:|:---:|
-| ![Tela Inicial do Jogo](Images/menu.png) | ![Partida em Andamento](Images/partida.png) | ![Batalha de Chefe](Images/chefe.png) |
+| ![Tela Inicial do Jogo](assets/Jogo/menu.png) | ![Partida em Andamento](assets/Jogo/partida.png) | ![Batalha de Chefe](assets/Jogo/chefe.png) |
 
 Um jogo de tiro espacial no estilo clássico, onde você comanda a última nave de defesa da galáxia contra hordas crescentes de perigosos invasores virais. Sobreviva, use power-ups e enfrente chefões para registrar a maior pontuação!
 
