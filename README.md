@@ -86,7 +86,8 @@ Siga os passos abaixo para rodar o Corona Invaders na sua máquina local.
 ├── assets/
 │   ├── font/
 │   ├── images/
-│   └── sounds/
+│   ├── sounds/
+│   └── jogo/
 ├── asset_manager.py
 ├── constants.py
 ├── entities.py
